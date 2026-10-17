@@ -22,7 +22,7 @@ Gotchas:
 
 - Navigation has NO router. Pages are switched by the `AppPage` union + module-level `currentPage` ref in `composables/useNavigation.ts`. Adding a page requires: extend `AppPage`, add a `v-if`/`v-else-if` branch in `src/App.vue`, wire `@navigate` through the sidebar.
 - All routes render only when authenticated: `src/App.vue` gates everything behind `isAuthenticated` (`features/auth/useAuth.ts`); unauthenticated users see `LandingPage`. Login ALWAYS hits the real API (`POST /auth/login`) — no mock fallback anywhere since mocks were removed; token lives in localStorage key `studyflow-auth` and is attached as Bearer by `httpClient`.
-- `VITE_API_BASE_URL` unset ⇒ httpClient throws on every call (login included). Dev requires `.env` + backend implementing the contract in `TODO.md`.
+- `VITE_API_BASE_URL` unset ⇒ httpClient throws on every call (login included). Dev requires `.env` + backend implementing the contract in `TODO_BACK.md`.
 - Sidebar profile comes from `useStudentProfile()` (auth user), never hardcoded per page.
 - localStorage access stays out of pages (composables only). Keys in use: `studyflow-theme`, `studyflow-locale`, `studyflow-auth`.
 

@@ -1,6 +1,7 @@
-import { httpClient } from '../../composables/httpClient'
+import { httpClient, unwrap } from '../../composables/httpClient'
+import type { DefaultResponse } from '../../composables/httpClient'
 import type { FocusSession } from './types'
 
 export async function getTodaySessions(): Promise<FocusSession[]> {
-  return httpClient<FocusSession[]>('/pomodoro/sessions')
+  return unwrap(await httpClient<DefaultResponse<FocusSession[]>>('/pomodoro/sessions'))
 }

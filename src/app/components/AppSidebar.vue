@@ -7,7 +7,7 @@ defineEmits<{ navigate: [page: AppPage] }>()
 const { t } = useI18n()
 const { pending, logout } = useAuth()
 const navItems: { key: AppPage; icon: string }[] = [
-  { key:'dashboard', icon:'/assets/house.svg' }, { key:'pomodoro', icon:'/assets/clock.svg' }, { key:'notes', icon:'/assets/file-text.svg' }, { key:'reminders', icon:'/assets/list-check.svg' }, { key:'projects', icon:'/assets/graduation-cap.svg' }, { key:'review', icon:'/assets/file-search.svg' }
+  { key:'dashboard', icon:'/assets/house.svg' }, { key:'pomodoro', icon:'/assets/clock.svg' }, { key:'notes', icon:'/assets/file-text.svg' }, { key:'tasks', icon:'/assets/list-check.svg' }, { key:'projects', icon:'/assets/graduation-cap.svg' }, { key:'review', icon:'/assets/file-search.svg' }, { key:'profile', icon:'/assets/user.svg' }
 ]
 </script>
 
