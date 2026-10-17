@@ -9,11 +9,12 @@ import type { AppPage } from '../composables/useNavigation'
 defineEmits<{ navigate: [page: AppPage] }>()
 import { useStudentProfile } from '../features/auth/useAuth'
 import { useDashboard } from '../features/dashboard/useDashboard'
+import { formatEndDate } from '../features/tasks/taskFormat'
 
 const { t } = useI18n()
 const { student } = useStudentProfile()
 const firstName = computed(() => student.value.name.split(' ')[0])
-const { data, loading, error, progress, formattedTime, savingReminderId, load, toggleReminder, toggleFocus, resetFocus } = useDashboard()
+const { data, loading, error, progress, formattedTime, savingTaskId, load, toggleTask, toggleFocus, resetFocus } = useDashboard()
 onMounted(load)
 </script>
 
@@ -28,7 +29,7 @@ onMounted(load)
           <article class="card focus-card"><div class="card-title"><h2>{{ t('focusTitle') }}</h2><span class="tag">{{ t('focusTag') }}</span></div><div class="focus-row"><strong>{{ formattedTime }}</strong><button class="round primary" @click="toggleFocus"><img src="/assets/pause.svg" :alt="t('pause')" /></button><button class="round" @click="resetFocus"><img src="/assets/redo.svg" :alt="t('reset')" /></button></div><p>{{ t('focusSubject') }} {{ data.focus.subject }}</p></article>
         </div>
         <div class="right-column">
-          <article class="card"><div class="card-title"><h2>{{ t('todayReminders') }}</h2><button class="link">{{ t('seeAll') }}</button></div><div class="reminder-list"><button v-for="item in data.reminders" :key="item.id" class="reminder" :disabled="savingReminderId === item.id" @click="toggleReminder(item.id)"><span class="checkbox" :class="{ checked: item.completed }">✓</span><span class="reminder-info"><strong :class="{ done: item.completed }">{{ item.title }}</strong><small>{{ item.schedule }} <i /> <em>{{ item.subject }}</em></small></span><span class="priority" :class="item.priority.toLowerCase()">{{ item.priority }}</span></button></div></article>
+          <article class="card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in data.tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button></div></article>
           <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-grid"><article v-for="note in data.notes" :key="note.id" class="note"><span>{{ note.week }}</span><strong>{{ note.title }}</strong><small>{{ t('subjectLabel') }} {{ note.subject }}</small></article></div></article>
         </div>
       </div>

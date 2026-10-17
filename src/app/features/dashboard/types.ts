@@ -1,9 +1,9 @@
-import type { Reminder } from '../reminders/types'
+import type { Task } from '../tasks/types'
 
 export interface NotePreview { id: string; week: string; title: string; subject: string }
 export interface DashboardData {
   weeklyProgress: { completed: number; total: number }
   focus: { remainingSeconds: number; subject: string; running: boolean }
-  reminders: Reminder[]
+  tasks: Task[]
   notes: NotePreview[]
 }

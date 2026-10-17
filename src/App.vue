@@ -5,11 +5,13 @@ import LandingPage from './app/pages/LandingPage.vue'
 import DashboardPage from './app/pages/DashboardPage.vue'
 import PomodoroPage from './app/pages/PomodoroPage.vue'
 import NotesPage from './app/pages/NotesPage.vue'
-import RemindersPage from './app/pages/RemindersPage.vue'
+import TasksPage from './app/pages/TasksPage.vue'
 import ProjectsPage from './app/pages/ProjectsPage.vue'
 import ReviewPage from './app/pages/ReviewPage.vue'
+import ProfilePage from './app/pages/ProfilePage.vue'
 
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, initAuth } = useAuth()
+void initAuth()
 </script>
 
 <template>
@@ -17,7 +19,8 @@ const { isAuthenticated } = useAuth()
   <DashboardPage v-else-if="currentPage === 'dashboard'" @navigate="navigate" />
   <PomodoroPage v-else-if="currentPage === 'pomodoro'" @navigate="navigate" />
   <NotesPage v-else-if="currentPage === 'notes'" @navigate="navigate" />
-  <RemindersPage v-else-if="currentPage === 'reminders'" @navigate="navigate" />
+  <TasksPage v-else-if="currentPage === 'tasks'" @navigate="navigate" />
   <ProjectsPage v-else-if="currentPage === 'projects'" @navigate="navigate" />
-  <ReviewPage v-else @navigate="navigate" />
+  <ReviewPage v-else-if="currentPage === 'review'" @navigate="navigate" />
+  <ProfilePage v-else @navigate="navigate" />
 </template>

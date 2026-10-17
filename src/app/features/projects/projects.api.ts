@@ -1,14 +1,20 @@
-import { httpClient } from '../../composables/httpClient'
+import { httpClient, unwrap } from '../../composables/httpClient'
+import type { DefaultResponse } from '../../composables/httpClient'
 import type { Project, ProjectDetails, ProjectStage } from './types'
 
 export async function getProjects(): Promise<Project[]> {
-  return httpClient<Project[]>('/projects')
+  return unwrap(await httpClient<DefaultResponse<Project[]>>('/projects'))
 }
 
 export async function getProjectDetails(id: string): Promise<ProjectDetails> {
-  return httpClient<ProjectDetails>(`/projects/${id}`)
+  return unwrap(await httpClient<DefaultResponse<ProjectDetails>>(`/projects/${id}`))
 }
 
 export async function updateStage(projectId: string, stageId: string, done: boolean): Promise<ProjectStage> {
-  return httpClient<ProjectStage>(`/projects/${projectId}/stages/${stageId}`, { method: 'PATCH', body: JSON.stringify({ done }) })
+  return unwrap(
+    await httpClient<DefaultResponse<ProjectStage>>(`/projects/${projectId}/stages/${stageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ done })
+    })
+  )
 }
