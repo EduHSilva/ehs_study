@@ -1,0 +1,55 @@
+import { computed, ref } from 'vue'
+import { useI18n } from '../../composables/useI18n'
+import { getDashboard } from './dashboard.api'
+import { updateTask } from '../tasks/tasks.api'
+import { getTodaySessions } from '../pomodoro/pomodoro.api'
+import type { DashboardData } from './types'
+import type { FocusSession } from '../pomodoro/types'
+
+export function useDashboard() {
+  const { t } = useI18n()
+  const data = ref<DashboardData | null>(null)
+  const focus = ref<FocusSession | null>(null)
+  const loading = ref(true)
+  const savingTaskId = ref<string | null>(null)
+  const error = ref<string | null>(null)
+
+  const progress = computed(() => {
+    const { completed, total } = data.value?.weeklyProgress ?? { completed: 0, total: 0 }
+    if (!total) return 0
+    return Math.round(completed / total * 100)
+  })
+
+  // O foco não vive mais no dashboard: o cronômetro roda no cliente e o que persiste são as
+  // sessões de `/focus`. O card "Foco Ativo" mostra o último foco concluído hoje (se houver).
+  const load = async () => {
+    try {
+      loading.value = true
+      error.value = null
+      const [dashboard, sessions] = await Promise.all([
+        getDashboard(),
+        getTodaySessions().catch(() => [] as FocusSession[])
+      ])
+      data.value = dashboard
+      focus.value = sessions[0] ?? null
+    } catch {
+      error.value = t('dashboardLoadFailed')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const toggleTask = async (id: string) => {
+    if (!data.value) return
+    const item = data.value.tasks.find(task => task.id === id)
+    if (!item) return
+    savingTaskId.value = id
+    const previous = { ...item }
+    item.status = item.status === 'DONE' ? 'PENDING' : 'DONE'
+    try {
+      Object.assign(item, await updateTask({ ...item }))
+    } catch { Object.assign(item, previous); error.value = t('taskSaveFailed') } finally { savingTaskId.value = null }
+  }
+
+  return { data, focus, loading, error, progress, savingTaskId, load, toggleTask }
+}

@@ -1,0 +1,37 @@
+# Git / editores / SO
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Android (não faz parte da imagem web)
+app/
+.gradle
+.kotlin
+
+# Dependências e artefatos de build
+web/node_modules
+web/dist
+web/test-results
+web/playwright-report
+web/blob-report
+web/playwright/.cache
+**/node_modules
+**/dist
+**/*.log
+
+# Variáveis locais (exceto o exemplo versionado)
+**/.env
+**/.env.*
+!web/.env.example
+
+# Documentação não é necessária na imagem
+README.md
+AGENTS.md
+web/ARCHITECTURE.md
+web/DESIGN_SYSTEM.md
+web/README.md
+web/todo
