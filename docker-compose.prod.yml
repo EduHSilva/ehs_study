@@ -1,0 +1,20 @@
+# Produção: usa a imagem publicada no GitHub Container Registry.
+# A stack dos microservices deve estar ativa e sua rede externa deve existir.
+
+services:
+  study-ui:
+    image: ${STUDY_UI_IMAGE:-ghcr.io/eduhsilva/study-ui:${IMAGE_TAG:-latest}}
+    container_name: study-ui
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      default: {}
+      ehs_microservices:
+        aliases:
+          - study-ui
+
+networks:
+  ehs_microservices:
+    external: true
+    name: ${EHS_MICROSERVICES_NETWORK:-ehs_microservices_backend}
