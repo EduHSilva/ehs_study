@@ -17,4 +17,4 @@ services:
 networks:
   ehs_microservices:
     external: true
-    name: ${EHS_MICROSERVICES_NETWORK:-ehs_microservices_backend}
+    name: ${EHS_MICROSERVICES_NETWORK:-microservices_backend}
