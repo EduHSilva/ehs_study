@@ -1,0 +1,43 @@
+# Sobe o front web do StudyFlow conectado à rede do nginx dos microservices.
+#
+# O container não publica porta no host: o acesso é sempre pelo nginx dos
+# microservices em http://localhost/app/study/ (ou pelo domínio de produção).
+#
+# Requisitos:
+#   1. A stack dos microservices precisa estar no ar.
+#   2. A rede externa precisa existir:
+#        docker network ls | grep ehs_microservices
+#      Em produção (docker-compose.prod.yml) o nome é ehs_microservices_backend;
+#      ajuste com EHS_MICROSERVICES_NETWORK.
+#
+# Uso:
+#   docker compose up -d --build
+#   docker compose logs -f study-ui
+#
+# Para usar a imagem publicada pelo workflow (GHCR), veja README.md.
+
+services:
+  study-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_PATH: /app/study/
+        # "/" = same-origin através do nginx dos microservices.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    image: ${STUDY_UI_IMAGE:-ehs_study-ui:local}
+    container_name: study-ui
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      default: {}
+      ehs_microservices:
+        aliases:
+          - study-ui
+
+networks:
+  ehs_microservices:
+    external: true
+    name: ${EHS_MICROSERVICES_NETWORK:-ehs_microservices_default}

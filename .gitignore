@@ -1,6 +1,15 @@
+# Web (web/)
 .env
 node_modules
 dist
+
+# Android (app/)
+.gradle
+.kotlin
+build
+local.properties
+captures
+.cxx
 
 # Logs
 *.log
@@ -14,5 +23,11 @@ desktop.ini
 
 # Vite local overrides
 *.local
+
+# Playwright
+test-results
+playwright-report
+blob-report
+playwright/.cache
 
 todo

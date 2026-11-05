@@ -1,33 +1,92 @@
 # AGENTS.md
 
-Vue 3 + TypeScript + Vite SPA ("StudyFlow", pkg `studyflow-dashboard`). Student study dashboard. No router lib, no backend in-repo, no tests.
+Monorepo do StudyFlow (painel de estudos). Dois clientes do mesmo backend:
 
-## Commands
+- `web/` — SPA Vue 3 + TypeScript + Vite (pacote `studyflow-dashboard`), considerada estável.
+- `app/` — app Android nativo em Kotlin + Jetpack Compose (Material 3).
+
+O backend não está neste repositório; o contrato está em `web/todo/TODO_BACK.md`.
+
+## Web (`web/`) — comandos
+
+Execute a partir de `web/`:
 
 - Dev: `npm run dev`
-- Verify: `npm run build` — this IS the check: runs `vue-tsc -b` (typecheck) then `vite build`.
-- No lint, format, or test tooling is configured. Don't invent npm scripts; typecheck alone = `node node_modules/vue-tsc/bin/vue-tsc.js -b`.
-- `vue-tsc` is invoked by bin path (Windows-friendly), not `npx vue-tsc`. Keep it that way.
+- Verificação: `npm run build` — é o check: roda `vue-tsc -b` (typecheck) e `vite build`.
+- E2E: `npm run test:e2e` (Playwright + API mockada; primeira execução precisa de
+  `npx playwright install chromium`). UI: `npm run test:e2e:ui`.
+- Sem lint/format. Não invente scripts além dos existentes; typecheck isolado =
+  `node node_modules/vue-tsc/bin/vue-tsc.js -b`.
+- `vue-tsc` é chamado por caminho do binário (Windows-friendly), não `npx vue-tsc`.
+- Docker (a partir da raiz): `docker compose up -d --build`. O front é servido pelo nginx dos
+  microservices em `/app/study/` (container `study-ui`, rede `ehs_microservices_default`). Não
+  publique porta no host; em produção use `EHS_MICROSERVICES_NETWORK=ehs_microservices_backend`.
 
-## Architecture
+## Web — arquitetura
 
-Layering rules in ARCHITECTURE.md are followed; ignore its example feature names (workouts/diet/etc.) — the real feature is `src/app/features/dashboard`. Code lives under `src/app/`:
+As regras de `web/ARCHITECTURE.md` são seguidas; ignore os nomes de feature de exemplo
+(workouts/diet). O código fica em `web/src/app/`:
 
-- `pages/` — one component per screen; template + emits only, no domain logic or HTTP.
-- `features/<name>/` — `types.ts`, `<feature>.api.ts` (all HTTP here, must not import Vue), `use<Feature>.ts` (state, loading, validation).
-- `composables/` — shared infra: `httpClient`, `useNavigation`, `useTheme`, `useI18n`.
-- `components/` — shared visuals (`AppSidebar`, `ThemeToggle`, `LanguageToggle`).
+- `pages/` — uma tela por arquivo; template + emits, sem lógica de domínio ou HTTP.
+- `features/<nome>/` — `types.ts`, `<feature>.api.ts` (todo HTTP aqui, sem importar Vue) e
+  `use<Feature>.ts` (estado, loading, validação).
+- `composables/` — infra compartilhada: `httpClient`, `useNavigation`, `useTheme`, `useI18n`.
+- `components/` — visuais compartilhados (`AppSidebar`, `ThemeToggle`, `LanguageToggle`).
 
 Gotchas:
 
-- Navigation has NO router. Pages are switched by the `AppPage` union + module-level `currentPage` ref in `composables/useNavigation.ts`. Adding a page requires: extend `AppPage`, add a `v-if`/`v-else-if` branch in `src/App.vue`, wire `@navigate` through the sidebar.
-- All routes render only when authenticated: `src/App.vue` gates everything behind `isAuthenticated` (`features/auth/useAuth.ts`); unauthenticated users see `LandingPage`. Login ALWAYS hits the real API (`POST /auth/login`) — no mock fallback anywhere since mocks were removed; token lives in localStorage key `studyflow-auth` and is attached as Bearer by `httpClient`.
-- `VITE_API_BASE_URL` unset ⇒ httpClient throws on every call (login included). Dev requires `.env` + backend implementing the contract in `TODO_BACK.md`.
-- Sidebar profile comes from `useStudentProfile()` (auth user), never hardcoded per page.
-- localStorage access stays out of pages (composables only). Keys in use: `studyflow-theme`, `studyflow-locale`, `studyflow-auth`.
+- Sem router: navegação pelo union `AppPage` + `currentPage` em `composables/useNavigation.ts`.
+  Nova tela exige: estender `AppPage`, adicionar branch em `src/App.vue` e ligar `@navigate` na
+  sidebar.
+- Tudo só renderiza autenticado: `src/App.vue` atrás de `isAuthenticated`
+  (`features/auth/useAuth.ts`); sem sessão aparece a `LandingPage`. Login sempre chama a API real
+  (`POST /users/auth/login`); token em `localStorage` na chave `studyflow-auth`, enviado como
+  Bearer pelo `httpClient`.
+- `VITE_API_BASE_URL` ausente ⇒ `httpClient` lança em toda chamada (inclusive login). Dev precisa
+  de `.env` + backend implementando `todo/TODO_BACK.md`.
+- Endpoints de estudo vão pelo gateway em `/study/...` (`/study/notes/folders`, `/study/dashboard`,
+  `/study/projects`, `/study/focus`, `/study/review/report`); auth (`/users/...`) e tasks
+  (`/tasks/...`) ficam na raiz.
+- E2E em `web/tests/e2e/` mockam a API com `page.route` (`support/mockApi.ts`); `.env.test` aponta
+  `VITE_API_BASE_URL` para a origem do dev server (same-origin). Não precisam de backend.
+- Perfil da sidebar vem de `useStudentProfile()` (usuário autenticado), nunca hardcoded por página.
+- `localStorage` só em composables. Chaves: `studyflow-theme`, `studyflow-locale`, `studyflow-auth`.
 
-## Conventions
+## Android (`app/`) — comandos
 
-- Strict TS with `verbatimModuleSyntax`: type-only imports MUST use `import type { ... }` or the build fails.
-- UI strings are pt-BR; `useI18n` adds pt-BR/en switching (existing pages don't all use it yet).
-- Styling: semantic tokens only, never raw hex in components — use `var(--color-surface)` etc. from the `:root` / `[data-theme=dark]` blocks in `src/styles/global.css` (see DESIGN_SYSTEM.md for token groups: `--color-*`, `--space-1..6`, `--radius-*`).
+Execute a partir de `app/` (projeto Gradle com o módulo `:app`, ou seja, `app/app/src`):
+
+- Build/verificação: `./gradlew :app:assembleDebug` (Windows: `gradlew.bat :app:assembleDebug`).
+- Testes JVM: `./gradlew :app:testDebugUnitTest`.
+- Requer JDK 17+ (validado com o JBR do Android Studio) e Android SDK 36. `local.properties`
+  (não versionado) define `sdk.dir`, `studyflow.apiBaseUrl` e `studyflow.googleWebClientId`;
+  variáveis `ANDROID_HOME`, `STUDYFLOW_API_BASE_URL` e `STUDYFLOW_GOOGLE_WEB_CLIENT_ID` funcionam como
+  fallback.
+- Sem emulador conectado, a verificação é build + testes JVM.
+
+## Android — arquitetura
+
+- MVVM: cada feature em `feature/<nome>/` tem `ViewModel` com `StateFlow`; telas Compose só
+  observam estado e emitem ações. Sem lógica de domínio nas telas.
+- `data/remote` (DTOs + Retrofit), `data/repository` (HTTP), `data/mappers` (DTO → domínio
+  tolerante), `domain/` (regras puras, testáveis na JVM), `di/AppContainer` (injeção manual).
+- `core/` guarda infra: `network` (OkHttp/Retrofit/envelope), `session`, `settings`, `prefs`,
+  `i18n` e `ui` (tema + componentes).
+- Navegação com Navigation Compose (drawer + bottom bar). A tela de revisão existe, mas o item de
+  menu fica desabilitado com **EM BREVE**, igual ao web.
+- Sessão: `SessionManager` persiste token + usuário em `SharedPreferences` nas mesmas chaves do web
+  (`studyflow-auth`, `studyflow-theme`, `studyflow-locale`). Resposta `401` expira a sessão; chamadas
+  de `/tasks` enviam `X-User-ID`.
+- HTTP em texto puro só no build `debug` (manifest overlay). Produção deve usar HTTPS.
+- Regras de calendário/formatação/validação ficam em `domain/` e têm testes em
+  `app/src/test/java/...` (`StudyCalendarTest`, `TaskFormatTest`, `AuthValidationTest`).
+
+## Convenções (ambos)
+
+- Web: TypeScript estrito com `verbatimModuleSyntax` — imports de tipo DEVEM usar
+  `import type { ... }` ou o build falha.
+- Strings de UI em pt-BR; o web alterna pt-BR/en com `useI18n` e o Android com `core/i18n/Strings`
+  (mesmas chaves nos dois).
+- Estilo: somente tokens semânticos, nunca hex cru nos componentes. Web usa `var(--color-*)` de
+  `web/src/styles/global.css`; Android usa `MaterialTheme.colorScheme` e `StudyFlowTheme.colors`.
+- Não versione `web/.env`, `app/local.properties`, `node_modules`, `dist` ou artefatos de build.
