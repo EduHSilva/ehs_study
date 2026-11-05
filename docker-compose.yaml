@@ -7,7 +7,7 @@
 #   1. A stack dos microservices precisa estar no ar.
 #   2. A rede externa precisa existir:
 #        docker network ls | grep ehs_microservices
-#      Em produção (docker-compose.prod.yml) o nome é ehs_microservices_backend;
+#      Em produção (docker-compose.prod.yml) o nome padrão é ehs_microservices_backend;
 #      ajuste com EHS_MICROSERVICES_NETWORK.
 #
 # Uso:

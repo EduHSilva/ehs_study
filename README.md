@@ -54,8 +54,10 @@ docker compose up -d --build
 - `VITE_BASE_PATH=/app/study/` e `VITE_API_BASE_URL=/` (same-origin) são definidos no build.
 - A imagem publicada pelo GitHub Actions é `ghcr.io/eduhsilva/study-ui`
   (tags `latest` e `<sha>`), gerada por `.github/workflows/build.yml`. Para usar a imagem
-  publicada em vez de buildar localmente:
-  `STUDY_UI_IMAGE=ghcr.io/eduhsilva/study-ui:latest docker compose pull study-ui && docker compose up -d --no-build`.
+  publicada em produção, use o compose dedicado (rede padrão `ehs_microservices_backend`):
+  `docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`.
+  Defina `IMAGE_TAG=<sha>` para fixar uma versão específica, ou `STUDY_UI_IMAGE` para substituir
+  o nome completo da imagem.
 - A rota `/app/study/` fica em `infra/nginx/conf.d/gateway.conf` no repositório dos
   microservices e aponta para o container `study-ui` na porta 80.
 
