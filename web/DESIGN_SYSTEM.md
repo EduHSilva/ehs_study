@@ -1,4 +1,4 @@
-# StudyFlow Design System
+# EHS Study Design System
 
 Os tokens editáveis vivem em `src/styles/global.css`, no bloco `:root` (modo claro) e `[data-theme=dark]` (modo escuro).
 

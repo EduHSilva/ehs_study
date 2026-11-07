@@ -50,6 +50,16 @@ test('lista as pastas e mostra as notas da pasta selecionada', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Introdução' })).toBeHidden()
 })
 
+test('mostra as notas da pasta como cartões com trecho e contagem', async ({ page }) => {
+  await openNotes(page)
+
+  const cards = page.locator('.note-cards .note-card')
+  await expect(cards).toHaveCount(2)
+  await expect(cards.first()).toContainText('Introdução')
+  await expect(cards.first()).toContainText('Primeira anotação')
+  await expect(page.getByRole('button', { name: /Semana 1/ })).toContainText('2')
+})
+
 test('salva a nota selecionada', async ({ page }) => {
   await openNotes(page)
 

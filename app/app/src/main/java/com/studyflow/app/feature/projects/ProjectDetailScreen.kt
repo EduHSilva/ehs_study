@@ -51,9 +51,10 @@ import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.ProgressRing
 import com.studyflow.app.core.ui.components.Tag
 import com.studyflow.app.core.ui.theme.StudyFlowTheme
-import com.studyflow.app.data.model.ProjectMilestone
+import com.studyflow.app.data.model.ProjectVersion
 import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.domain.ApiDates
+import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.TaskFormat
 import com.studyflow.app.ui.appViewModel
 import java.time.LocalDateTime
@@ -61,16 +62,16 @@ import java.time.LocalDateTime
 @Composable
 fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
     val vm: ProjectDetailViewModel = appViewModel {
-        ProjectDetailViewModel(projectId, it.projectsRepository)
+        ProjectDetailViewModel(projectId, it.projectsRepository, it.tasksRepository)
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStrings.current
 
     var newStageTitle by rememberSaveable { mutableStateOf("") }
-    var newMilestoneTitle by rememberSaveable { mutableStateOf("") }
-    var newMilestoneDue by remember { mutableStateOf<LocalDateTime?>(null) }
+    var newVersionTitle by rememberSaveable { mutableStateOf("") }
+    var newVersionDue by remember { mutableStateOf<LocalDateTime?>(null) }
 
-    var editing by remember { mutableStateOf<ProjectMilestone?>(null) }
+    var editing by remember { mutableStateOf<ProjectVersion?>(null) }
     var editTitle by rememberSaveable { mutableStateOf("") }
     var editDue by remember { mutableStateOf<LocalDateTime?>(null) }
 
@@ -96,17 +97,17 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
     if (editing != null) {
         AlertDialog(
             onDismissRequest = { editing = null },
-            title = { Text(s["editMilestone"]) },
+            title = { Text(s["editVersionAction"]) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
-                        label = { Text(s["milestoneTitleLabel"]) },
+                        label = { Text(s["versionTitleLabel"]) },
                         singleLine = true,
                     )
                     DateTimeField(
-                        label = s["milestoneDueDateLabel"],
+                        label = s["versionDueDateLabel"],
                         value = editDue,
                         onChange = { editDue = it },
                         allowClear = false,
@@ -117,7 +118,7 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                 TextButton(
                     onClick = {
                         val target = editing ?: return@TextButton
-                        vm.updateMilestone(target.id, editTitle, editDue)
+                        vm.updateVersion(target.id, editTitle, editDue)
                         editing = null
                     },
                     enabled = editTitle.isNotBlank() && editDue != null,
@@ -154,7 +155,7 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(details.project.title, style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "${s["advisorLabel"]} ${details.project.advisor.ifBlank { "—" }}",
+                            "${s["advisorLabel"]} ${details.project.advisor.ifBlank { s["noAdvisor"] }}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -181,35 +182,76 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
             ContentCard {
                 CardTitle(s["stagesTitle"])
                 Spacer(Modifier.height(12.dp))
+                if (state.tasksLoading) {
+                    LoadingScreen(s["projectTasksLoading"])
+                } else if (state.tasksErrorKey != null) {
+                    ErrorBanner(
+                        message = s[state.tasksErrorKey!!],
+                        onRetry = vm::loadTasks,
+                        retryLabel = s["retry"],
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     details.stages.forEach { stage ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
-                                .clickable(
-                                    enabled = state.savingStageId != stage.id,
-                                    onClick = { vm.toggleStage(stage.id) },
+                        val stageTasks = state.tasks.filter { it.stageId == stage.id }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
+                                    .clickable(
+                                        enabled = state.savingStageId != stage.id,
+                                        onClick = { vm.toggleStage(stage.id) },
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                CheckSquare(checked = stage.done)
+                                Text(
+                                    stage.name,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textDecoration = if (stage.done) TextDecoration.LineThrough else TextDecoration.None,
+                                    color = if (stage.done) MaterialTheme.colorScheme.onSurfaceVariant
+                                    else MaterialTheme.colorScheme.onSurface,
                                 )
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            CheckSquare(checked = stage.done)
-                            Text(
-                                stage.name,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                textDecoration = if (stage.done) TextDecoration.LineThrough else TextDecoration.None,
-                                color = if (stage.done) MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.onSurface,
-                            )
-                            if (state.savingStageId == stage.id) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
+                                Text(
+                                    s.format("stageTaskCount", "count" to stageTasks.size),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StudyFlowTheme.colors.subtle,
+                                )
+                                if (state.savingStageId == stage.id) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
+                            }
+                            stageTasks.forEach { task ->
+                                ProjectTaskRow(
+                                    title = task.title,
+                                    done = StudyCalendar.isTaskDone(task, state.todayKey),
+                                    daily = task.type == com.studyflow.app.data.model.TaskType.DAILY,
                                 )
                             }
+                        }
+                    }
+                    val unassigned = state.tasks.filter { it.stageId.isNullOrBlank() }
+                    if (unassigned.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            s["unassignedTasksTitle"],
+                            style = MaterialTheme.typography.labelMedium,
+                            color = StudyFlowTheme.colors.subtle,
+                        )
+                        unassigned.forEach { task ->
+                            ProjectTaskRow(
+                                title = task.title,
+                                done = StudyCalendar.isTaskDone(task, state.todayKey),
+                                daily = task.type == com.studyflow.app.data.model.TaskType.DAILY,
+                            )
                         }
                     }
                 }
@@ -250,13 +292,13 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
 
         item {
             ContentCard {
-                CardTitle(s["milestonesTitle"])
+                CardTitle(s["versionsTitle"])
                 Spacer(Modifier.height(12.dp))
-                if (details.milestones.isEmpty()) {
-                    EmptyNote(s["noMilestones"])
+                if (details.versions.isEmpty()) {
+                    EmptyNote(s["noVersions"])
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        details.milestones.forEachIndexed { index, milestone ->
+                        details.versions.forEachIndexed { index, version ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -264,12 +306,12 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                             ) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        s.format("milestoneLabel", "index" to index + 1),
+                                        s.format("versionLabel", "index" to index + 1),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = StudyFlowTheme.colors.subtle,
                                     )
                                     Text(
-                                        milestone.title,
+                                        version.title,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -278,7 +320,7 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                                     Text(
                                         s.format(
                                             "dueDateLabel",
-                                            "date" to TaskFormat.formatCompactDate(milestone.dueDate, s.locale),
+                                            "date" to TaskFormat.formatCompactDate(version.dueDate, s.locale),
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = StudyFlowTheme.colors.subtle,
@@ -286,14 +328,14 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                                 }
                                 IconButton(
                                     onClick = {
-                                        editing = milestone
-                                        editTitle = milestone.title
-                                        editDue = ApiDates.localDateTimeOrNull(milestone.dueDate)
+                                        editing = version
+                                        editTitle = version.title
+                                        editDue = ApiDates.localDateTimeOrNull(version.dueDate)
                                     },
                                 ) {
                                     Icon(
                                         Icons.Filled.Edit,
-                                        contentDescription = s["editMilestone"],
+                                        contentDescription = s["editVersionAction"],
                                         tint = StudyFlowTheme.colors.subtle,
                                         modifier = Modifier.size(16.dp),
                                     )
@@ -306,17 +348,17 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = newMilestoneTitle,
-                        onValueChange = { newMilestoneTitle = it },
-                        label = { Text(s["milestoneTitleLabel"]) },
-                        placeholder = { Text(s["milestoneTitlePlaceholder"]) },
+                        value = newVersionTitle,
+                        onValueChange = { newVersionTitle = it },
+                        label = { Text(s["versionTitleLabel"]) },
+                        placeholder = { Text(s["versionTitlePlaceholder"]) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     DateTimeField(
-                        label = s["milestoneDueDateLabel"],
-                        value = newMilestoneDue,
-                        onChange = { newMilestoneDue = it },
+                        label = s["versionDueDateLabel"],
+                        value = newVersionDue,
+                        onChange = { newVersionDue = it },
                         allowClear = false,
                     )
                     Row(
@@ -327,16 +369,16 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                         Spacer(Modifier.weight(1f))
                         Button(
                             onClick = {
-                                vm.createMilestone(newMilestoneTitle, newMilestoneDue)
-                                newMilestoneTitle = ""
-                                newMilestoneDue = null
+                                vm.createVersion(newVersionTitle, newVersionDue)
+                                newVersionTitle = ""
+                                newVersionDue = null
                             },
-                            enabled = !state.savingNewMilestone &&
-                                newMilestoneTitle.isNotBlank() &&
-                                newMilestoneDue != null,
+                            enabled = !state.savingNewVersion &&
+                                newVersionTitle.isNotBlank() &&
+                                newVersionDue != null,
                             shape = RoundedCornerShape(8.dp),
                         ) {
-                            if (state.savingNewMilestone) {
+                            if (state.savingNewVersion) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(14.dp),
                                     strokeWidth = 2.dp,
@@ -344,11 +386,41 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit) {
                                 )
                                 Spacer(Modifier.width(6.dp))
                             }
-                            Text(if (state.savingNewMilestone) s["saving"] else s["addMilestone"])
+                            Text(if (state.savingNewVersion) s["saving"] else s["addVersion"])
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProjectTaskRow(title: String, done: Boolean, daily: Boolean) {
+    val s = LocalStrings.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 30.dp, top = 4.dp, end = 10.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CheckSquare(checked = done, size = 16.dp)
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+            color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (daily) {
+            Tag(
+                text = s["taskTypeDaily"],
+                color = MaterialTheme.colorScheme.primary,
+                background = StudyFlowTheme.colors.primarySoft,
+            )
         }
     }
 }

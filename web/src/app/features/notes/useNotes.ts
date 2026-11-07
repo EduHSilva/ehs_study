@@ -130,5 +130,5 @@ export function useNotes() {
     }
   }
 
-  return { folders, folderNotes, selectedNote, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, renameFolder }
+  return { folders, folderNotes, selectedFolder, selectedNote, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, renameFolder }
 }

@@ -131,6 +131,13 @@ fun ProjectsScreen(onOpenProject: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { Subtitle(s["projectsSubtitle"]) }
+        item {
+            Text(
+                s["projectsHint"],
+                style = MaterialTheme.typography.bodySmall,
+                color = StudyFlowTheme.colors.subtle,
+            )
+        }
 
         if (state.errorKey != null) {
             item {

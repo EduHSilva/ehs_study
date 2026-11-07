@@ -50,7 +50,8 @@ Gotchas:
 - E2E em `web/tests/e2e/` mockam a API com `page.route` (`support/mockApi.ts`); `.env.test` aponta
   `VITE_API_BASE_URL` para a origem do dev server (same-origin). Não precisam de backend.
 - Perfil da sidebar vem de `useStudentProfile()` (usuário autenticado), nunca hardcoded por página.
-- `localStorage` só em composables. Chaves: `studyflow-theme`, `studyflow-locale`, `studyflow-auth`.
+- `localStorage` só em composables. Chaves: `studyflow-theme`, `studyflow-locale`, `studyflow-auth`,
+  `studyflow-pomodoro` (estado do cronômetro para sobreviver à navegação e ao reload).
 
 ## Android (`app/`) — comandos
 
