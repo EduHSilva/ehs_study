@@ -24,6 +24,9 @@ export interface Task {
   endDate: string | null
   type: TaskType
   status: TaskStatus
+  // Dia em que uma tarefa UNIQUE foi concluída. Enquanto pendente é nulo; quando concluída,
+  // o calendário mostra a tarefa só nesse dia. DAILY não usa (tem `dailyCompletions`).
+  completedDate: string | null
   projectId: string | null
   stageId: string | null
   dailyStatistics: DailyTaskStatistics | null

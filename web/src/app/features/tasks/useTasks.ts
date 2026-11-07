@@ -3,7 +3,7 @@ import { useI18n } from '../../composables/useI18n'
 import { getProjectDetails, getProjects } from '../projects/projects.api'
 import { createTask, deleteTask, getTasksInRange, updateTask } from './tasks.api'
 import { buildCalendarGrid, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
-import { localInputToIso } from './taskFormat'
+import { isoToLocalInput, localInputToIso } from './taskFormat'
 import type { Project, ProjectStage } from '../projects/types'
 import type { Task, TaskInput, TaskStatus, TaskType } from './types'
 
@@ -41,12 +41,20 @@ export function useTasks() {
   const projectOptions = ref<Project[]>([])
   const stagesByProject = ref<Record<string, ProjectStage[]>>({})
   const creating = ref(false)
+  const updating = ref(false)
+  const editingId = ref<string | null>(null)
   const formError = ref<string | null>(null)
 
   const stages = computed(() => (projectId.value ? stagesByProject.value[projectId.value] ?? [] : []))
   const projectName = (task: Task) => projectOptions.value.find(project => project.id === task.projectId)?.title ?? ''
   const stageName = (task: Task) =>
     (task.projectId ? stagesByProject.value[task.projectId]?.find(stage => stage.id === task.stageId)?.name : '') ?? ''
+  const editingTask = computed<Task | null>(() => {
+    if (!editingId.value) return null
+    return periodTasks.value.find(task => task.id === editingId.value)
+      ?? items.value.find(task => task.id === editingId.value)
+      ?? null
+  })
 
   const loadStages = async (id: string) => {
     if (stagesByProject.value[id]) return
@@ -73,10 +81,11 @@ export function useTasks() {
     await Promise.all(ids.filter(id => !stagesByProject.value[id]).map(loadStages))
   }
 
+  // `sync` para o reset da etapa acontecer antes de `openEdit` reaplicar a etapa da tarefa.
   watch(projectId, id => {
     stageId.value = ''
     if (id) void loadStages(id)
-  })
+  }, { flush: 'sync' })
 
   const todayKey = ref(dayKey(new Date()))
   // O dia que o toggle vai atingir: o selecionado no calendário, senão hoje. O checkbox e a ação
@@ -205,9 +214,35 @@ export function useTasks() {
     formError.value = null
   }
 
+  const closeForm = () => {
+    formOpen.value = false
+    editingId.value = null
+    resetForm()
+  }
+
   const toggleForm = () => {
-    formOpen.value = !formOpen.value
-    if (!formOpen.value) resetForm()
+    if (formOpen.value) {
+      closeForm()
+      return
+    }
+    editingId.value = null
+    resetForm()
+    formOpen.value = true
+  }
+
+  // O `watch` de `projectId` roda em `sync`, então ele limpa a etapa antes da gente reaplicar
+  // a etapa da tarefa logo abaixo.
+  const openEdit = (task: Task) => {
+    formOpen.value = true
+    editingId.value = task.id
+    formError.value = null
+    title.value = task.title
+    type.value = task.type
+    startDate.value = isoToLocalInput(task.startDate)
+    endDate.value = isoToLocalInput(task.endDate)
+    projectId.value = task.projectId ?? ''
+    stageId.value = task.stageId ?? ''
+    if (task.projectId) void loadStages(task.projectId)
   }
 
   const validate = (): boolean => {
@@ -270,6 +305,50 @@ export function useTasks() {
     }
   }
 
+  // Na edição o início/fim vazios viram `null`; o back mantém o valor atual nesse caso.
+  const buildUpdate = (): TaskInput => {
+    const link = projectId.value ? { projectId: projectId.value, stageId: stageId.value || null } : { projectId: null, stageId: null }
+    return {
+      title: title.value.trim(),
+      type: type.value,
+      startDate: localInputToIso(startDate.value),
+      endDate: localInputToIso(endDate.value),
+      ...link
+    }
+  }
+
+  const saveEdit = async (): Promise<boolean> => {
+    const id = editingId.value
+    if (!id || updating.value || !validate()) return false
+    updating.value = true
+    formError.value = null
+    let saved: Task
+    try {
+      saved = await updateTask({ id, ...buildUpdate() })
+    } catch {
+      formError.value = t('taskEditFailed')
+      updating.value = false
+      return false
+    }
+    // O PUT não devolve o histórico completo da DAILY; preserva o que a lista já tinha.
+    const previous = periodTasks.value.find(task => task.id === id) ?? items.value.find(task => task.id === id)
+    const merged: Task = { ...saved, dailyCompletions: previous?.dailyCompletions ?? saved.dailyCompletions }
+    periodTasks.value = periodTasks.value.map(task => (task.id === id ? merged : task))
+    items.value = items.value.map(task => (task.id === id ? merged : task))
+    closeForm()
+    try {
+      await fetchPeriod()
+      applyFilter()
+    } catch {
+      error.value = t('tasksLoadFailed')
+    } finally {
+      updating.value = false
+    }
+    return true
+  }
+
+  const submitForm = () => (editingId.value ? saveEdit() : create())
+
 const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PENDING' : 'DONE')
 
   const toggle = async (id: string) => {
@@ -301,10 +380,12 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     // Otimismo: numa DAILY o que muda é a lista de dias concluídos, porque é ela que pinta o
     // calendário. O back só aceita `completionDate` quando a task tem `startDate`/`endDate`
     // (sem intervalo ele rejeita qualquer data), então nesse caso deixa o dia corrente implícito.
-    const completionDate = current.type === 'DAILY' && (current.startDate || current.endDate) ? day : null
+    // Numa UNIQUE o dia vai como `completedDate`: concluída, o calendário mostra a task só ali.
+    const completionDate = current.type === 'DAILY' ? ((current.startDate || current.endDate) ? day : null) : day
     const optimistic: Task = {
       ...current,
       status: next,
+      completedDate: current.type === 'DAILY' ? current.completedDate : (next === 'DONE' ? day : null),
       dailyStatistics: current.dailyStatistics
         ? { ...current.dailyStatistics, completedToday: next === 'DONE' && day === todayKey.value }
         : null,
@@ -343,6 +424,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     deletingId.value = id
     try {
       await deleteTask(id)
+      if (editingId.value === id) closeForm()
       periodTasks.value = periodTasks.value.filter(task => task.id !== id)
       items.value = items.value.filter(task => task.id !== id)
       applyFilter()
@@ -384,6 +466,9 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     projectName,
     stageName,
     creating,
+    updating,
+    editingId,
+    editingTask,
     formError,
     todayKey,
     isDone,
@@ -396,6 +481,8 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     toggle,
     remove,
     toggleForm,
-    create
+    create,
+    openEdit,
+    submitForm
   }
 }

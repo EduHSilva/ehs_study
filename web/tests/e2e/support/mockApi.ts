@@ -19,15 +19,32 @@ export interface DashboardPayload {
   notes: Note[]
 }
 
+export interface MockTask {
+  id: string
+  title: string
+  createdDate?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  type: 'UNIQUE' | 'DAILY'
+  status: string
+  completedDate?: string | null
+  projectId?: string | null
+  stageId?: string | null
+  dailyStatistics?: unknown
+  dailyCompletions?: Array<{ completionDate: string; completedAt: string | null }>
+}
+
 export interface MockState {
   folders: Folder[]
   dashboard?: DashboardPayload
   sessions?: unknown[]
   projects?: unknown[]
   projectDetails?: Record<string, unknown>
+  tasks?: MockTask[]
   nextProjectId?: number
   nextFolderId?: number
   nextNoteId?: number
+  nextTaskId?: number
 }
 
 const USER = {
@@ -48,6 +65,11 @@ const DEFAULT_DASHBOARD: DashboardPayload = {
 
 function envelope(data: unknown) {
   return { message: 'ok', data, links: null }
+}
+
+function localDayKey(date = new Date()): string {
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
 async function fulfill(route: Route, data: unknown, status = 200) {
@@ -77,13 +99,53 @@ export async function mockApi(page: Page, state: MockState) {
   })
 
   await page.route(url => url.pathname === '/tasks' || url.pathname.startsWith('/tasks/'), async route => {
-    if (route.request().method() === 'GET') {
-      return fulfill(route, { total: 0, page: 0, size: 100, items: [] })
+    const request = route.request()
+    const method = request.method()
+    const tasks = (state.tasks ??= [])
+
+    if (method === 'GET') {
+      return fulfill(route, { total: tasks.length, page: 0, size: 100, items: tasks })
     }
+
+    if (method === 'POST') {
+      const body = request.postDataJSON() as Partial<MockTask>
+      const task: MockTask = {
+        id: `task-${state.nextTaskId ?? 100}`,
+        createdDate: new Date().toISOString(),
+        type: 'UNIQUE',
+        status: 'PENDING',
+        dailyStatistics: null,
+        dailyCompletions: [],
+        ...body,
+        title: body.title ?? ''
+      }
+      state.nextTaskId = (state.nextTaskId ?? 100) + 1
+      tasks.push(task)
+      return fulfill(route, task)
+    }
+
+    const id = new URL(request.url()).pathname.split('/').pop()
+    const task = tasks.find(item => item.id === id)
+    if (!task) return fulfill(route, null, 404)
+
+    if (method === 'PUT') {
+      const body = request.postDataJSON() as Partial<MockTask> & { completionDate?: string | null }
+      Object.assign(task, body)
+      if (task.type === 'UNIQUE' && body.status) {
+        task.completedDate = body.status === 'DONE' ? (body.completionDate ?? localDayKey()) : null
+      }
+      return fulfill(route, task)
+    }
+
+    if (method === 'DELETE') {
+      state.tasks = tasks.filter(item => item.id !== id)
+      return fulfill(route, null)
+    }
+
     return route.fulfill({
       status: 404,
       contentType: 'application/json',
-      body: JSON.stringify({ message: `unmocked ${route.request().method()} ${new URL(route.request().url()).pathname}` })
+      body: JSON.stringify({ message: `unmocked ${method} ${new URL(request.url()).pathname}` })
     })
   })
 

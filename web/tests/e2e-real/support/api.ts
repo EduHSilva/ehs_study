@@ -90,6 +90,39 @@ export async function deleteFolderQuietly(request: APIRequestContext, token: str
   await request.delete(`${API_BASE_URL}/study/notes/folders/${id}`, { headers: auth(token) })
 }
 
+export interface ApiTask {
+  id: string
+  title: string
+  startDate: string | null
+  endDate: string | null
+  type: string
+  status: string
+  completedDate: string | null
+  projectId: string | null
+  stageId: string | null
+}
+
+export interface ApiTaskInput {
+  title: string
+  startDate: string | null
+  endDate: string | null
+  type: string
+  projectId: string | null
+  stageId: string | null
+}
+
+export async function createTask(request: APIRequestContext, token: string, data: ApiTaskInput): Promise<ApiTask> {
+  return body<ApiTask>(await request.post(`${API_BASE_URL}/tasks`, { headers: auth(token), data }))
+}
+
+export async function getTask(request: APIRequestContext, token: string, id: string): Promise<ApiTask> {
+  return body<ApiTask>(await request.get(`${API_BASE_URL}/tasks/${id}`, { headers: auth(token) }))
+}
+
+export async function deleteTaskQuietly(request: APIRequestContext, token: string, id: string): Promise<void> {
+  await request.delete(`${API_BASE_URL}/tasks/${id}`, { headers: auth(token) })
+}
+
 export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }

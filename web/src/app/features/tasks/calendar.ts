@@ -117,7 +117,8 @@ export function taskEnd(task: Task): Date | null {
 
 // Tarefas que valem para um dia, já com a conclusão apurada para aquele dia.
 //
-// - `UNIQUE` ocupa todos os dias entre `startDate` e `endDate`; concluída = `status === 'DONE'`.
+// - `UNIQUE` pendente ocupa todos os dias entre `startDate` e `endDate`; concluída, ocupa só o
+//   dia de `completedDate` (tarefas antigas sem a data continuam ocupando o intervalo todo).
 // - `DAILY` está agendada todos os dias a partir do início e concluída quando o dia está em
 //   `dailyCompletions` (o backend salva a conclusão dia a dia).
 export function tasksForDay(tasks: Task[], key: string, today: string): DayTask[] {
@@ -138,6 +139,10 @@ export function tasksForDay(tasks: Task[], key: string, today: string): DayTask[
     const fromMs = startOfDay(from).getTime()
     const toMs = startOfDay(to).getTime()
     if (dayMs < fromMs || dayMs > toMs) continue
+    if (task.status === 'DONE') {
+      const completedOn = dayKeyFrom(task.completedDate)
+      if (completedOn && completedOn !== key) continue
+    }
     result.push({ task, done: task.status === 'DONE' })
   }
   return result
