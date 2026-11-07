@@ -76,6 +76,8 @@ data class TaskDto(
     val type: String? = null,
     val status: String? = null,
     val completed: Boolean? = null,
+    val projectId: String? = null,
+    val stageId: String? = null,
     val dailyStatistics: DailyStatsDto? = null,
     val dailyCompletions: List<DailyCompletionDto>? = null,
 )
@@ -94,6 +96,8 @@ data class CreateTaskRequest(
     val startDate: String? = null,
     val endDate: String? = null,
     val type: String,
+    val projectId: String? = null,
+    val stageId: String? = null,
 )
 
 @Serializable
@@ -104,6 +108,8 @@ data class UpdateTaskRequest(
     val endDate: String? = null,
     val status: String? = null,
     val completionDate: String? = null,
+    val projectId: String? = null,
+    val stageId: String? = null,
 )
 
 // ---------------------------------------------------------------------------
@@ -180,7 +186,7 @@ data class DashboardDto(
 // ---------------------------------------------------------------------------
 
 @Serializable
-data class MilestoneDto(
+data class VersionDto(
     val id: String = "",
     val title: String = "",
     val dueDate: String = "",
@@ -202,8 +208,7 @@ data class ProjectDto(
     val progress: Int? = null,
     val advisor: String? = null,
     val stages: List<StageDto>? = null,
-    // O back envia a lista de marcos no singular (`milestone`).
-    val milestone: List<MilestoneDto>? = null,
+    val versions: List<VersionDto>? = null,
 )
 
 @Serializable
@@ -220,7 +225,7 @@ data class CreateProjectRequest(
 data class StageRequest(val idProject: String, val title: String, val done: Boolean)
 
 @Serializable
-data class MilestoneRequest(val idProject: String, val title: String, val dueDate: String)
+data class VersionRequest(val idProject: String, val title: String, val dueDate: String)
 
 // ---------------------------------------------------------------------------
 // Review

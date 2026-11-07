@@ -14,7 +14,7 @@ import type { Task } from '../features/tasks/types'
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
 const { student } = useStudentProfile()
-const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, creating, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, remove, toggleForm, create } = useTasks()
+const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, remove, toggleForm, create } = useTasks()
 onMounted(load)
 
 const WEEKDAYS = computed(() => {
@@ -84,12 +84,16 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
           <label v-if="type === 'UNIQUE'" class="field"><span>{{ t('taskStartDateLabel') }}</span><input v-model="startDate" type="datetime-local" /></label>
           <label class="field"><span>{{ t('taskEndDateLabel') }}</span><input v-model="endDate" type="datetime-local" /></label>
         </div>
+        <div class="task-form-row">
+          <label class="field"><span>{{ t('taskProjectLabel') }}</span><select v-model="projectId" class="select"><option value="">{{ t('taskProjectNone') }}</option><option v-for="project in projectOptions" :key="project.id" :value="project.id">{{ project.title }}</option></select></label>
+          <label class="field"><span>{{ t('taskStageLabel') }}</span><select v-model="stageId" class="select" :disabled="!projectId || !stages.length"><option value="">{{ t('taskStageNone') }}</option><option v-for="stage in stages" :key="stage.id" :value="stage.id">{{ stage.name }}</option></select></label>
+        </div>
         <p v-if="formError" class="form-error">{{ formError }}</p>
         <div class="task-form-actions"><button class="button" type="submit" :disabled="creating">{{ creating ? t('saving') : t('taskSaveAction') }}</button><button class="button secondary" type="button" :disabled="creating" @click="toggleForm">{{ t('cancelAction') }}</button></div>
       </form>
       <p v-if="!items.length && !error" class="empty-note">{{ t('noTasks') }}</p>
       <div v-for="item in items" :key="item.id" class="task-line">
-        <button class="task-row" :disabled="savingId === item.id" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatTaskPeriod(item.startDate, item.endDate) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
+        <button class="task-row" :disabled="savingId === item.id" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatTaskPeriod(item.startDate, item.endDate) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
         <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>
       </div>
       <button class="floating-add" :aria-expanded="formOpen" @click="toggleForm">＋</button>

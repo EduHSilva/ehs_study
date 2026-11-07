@@ -1,8 +1,10 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { getProjectDetails, getProjects } from '../projects/projects.api'
 import { createTask, deleteTask, getTasksInRange, updateTask } from './tasks.api'
 import { buildCalendarGrid, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
 import { localInputToIso } from './taskFormat'
+import type { Project, ProjectStage } from '../projects/types'
 import type { Task, TaskInput, TaskStatus, TaskType } from './types'
 
 const TITLE_MIN_LENGTH = 1
@@ -34,8 +36,47 @@ export function useTasks() {
   const startDate = ref('')
   const endDate = ref('')
   const type = ref<TaskType>('UNIQUE')
+  const projectId = ref('')
+  const stageId = ref('')
+  const projectOptions = ref<Project[]>([])
+  const stagesByProject = ref<Record<string, ProjectStage[]>>({})
   const creating = ref(false)
   const formError = ref<string | null>(null)
+
+  const stages = computed(() => (projectId.value ? stagesByProject.value[projectId.value] ?? [] : []))
+  const projectName = (task: Task) => projectOptions.value.find(project => project.id === task.projectId)?.title ?? ''
+  const stageName = (task: Task) =>
+    (task.projectId ? stagesByProject.value[task.projectId]?.find(stage => stage.id === task.stageId)?.name : '') ?? ''
+
+  const loadStages = async (id: string) => {
+    if (stagesByProject.value[id]) return
+    try {
+      const details = await getProjectDetails(id)
+      stagesByProject.value = { ...stagesByProject.value, [id]: details.stages }
+    } catch {
+      stagesByProject.value = { ...stagesByProject.value, [id]: [] }
+    }
+  }
+
+  const loadProjectOptions = async () => {
+    try {
+      projectOptions.value = await getProjects()
+    } catch {
+      projectOptions.value = []
+    }
+    if (projectId.value) await loadStages(projectId.value)
+  }
+
+  // Nomes de projeto/etapa para as tags da lista: as etapas só vêm no detalhe do projeto.
+  const resolveTaskLinks = async () => {
+    const ids = [...new Set(periodTasks.value.map(task => task.projectId).filter((id): id is string => !!id))]
+    await Promise.all(ids.filter(id => !stagesByProject.value[id]).map(loadStages))
+  }
+
+  watch(projectId, id => {
+    stageId.value = ''
+    if (id) void loadStages(id)
+  })
 
   const todayKey = ref(dayKey(new Date()))
   // O dia que o toggle vai atingir: o selecionado no calendário, senão hoje. O checkbox e a ação
@@ -88,6 +129,7 @@ export function useTasks() {
     // Busca a grade completa (inclui dias vizinhos do mês); o filtro da lista usa o período estrito.
     const { from, to } = gridRange.value
     periodTasks.value = await getTasksInRange(from, to)
+    await resolveTaskLinks()
   }
 
   const refresh = async () => {
@@ -107,6 +149,7 @@ export function useTasks() {
     loading.value = true
     calendarLoading.value = true
     try {
+      await loadProjectOptions()
       await refresh()
     } finally {
       loading.value = false
@@ -157,6 +200,8 @@ export function useTasks() {
     startDate.value = ''
     endDate.value = ''
     type.value = 'UNIQUE'
+    projectId.value = ''
+    stageId.value = ''
     formError.value = null
   }
 
@@ -191,11 +236,12 @@ export function useTasks() {
   // porque a recorrência passa a valer a partir do cadastro.
   const buildInput = (): TaskInput => {
     const end = localInputToIso(endDate.value)
+    const link = projectId.value ? { projectId: projectId.value, stageId: stageId.value || null } : { projectId: null, stageId: null }
     if (type.value === 'DAILY') {
-      return { title: title.value.trim(), startDate: localInputToIso(startDate.value) ?? new Date().toISOString(), endDate: end, type: 'DAILY' }
+      return { title: title.value.trim(), startDate: localInputToIso(startDate.value) ?? new Date().toISOString(), endDate: end, type: 'DAILY', ...link }
     }
     const start = localInputToIso(startDate.value) ?? end
-    return { title: title.value.trim(), startDate: start, endDate: end, type: 'UNIQUE' }
+    return { title: title.value.trim(), startDate: start, endDate: end, type: 'UNIQUE', ...link }
   }
 
   const create = async (): Promise<boolean> => {
@@ -331,6 +377,12 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     startDate,
     endDate,
     type,
+    projectId,
+    stageId,
+    projectOptions,
+    stages,
+    projectName,
+    stageName,
     creating,
     formError,
     todayKey,

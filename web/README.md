@@ -1,6 +1,6 @@
-# StudyFlow — Web
+# EHS Study — Web
 
-SPA em Vue 3 + TypeScript + Vite do StudyFlow (pacote `studyflow-dashboard`). É o cliente web do
+SPA em Vue 3 + TypeScript + Vite do EHS Study (pacote `studyflow-dashboard`). É o cliente web do
 mesmo backend usado pelo app Android em `../app`.
 
 ## Requisitos
