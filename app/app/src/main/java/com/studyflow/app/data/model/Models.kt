@@ -24,6 +24,8 @@ data class Task(
     val endDate: String?,
     val type: TaskType,
     val status: TaskStatus,
+    val projectId: String? = null,
+    val stageId: String? = null,
     val dailyStatistics: DailyTaskStatistics?,
     val dailyCompletions: List<DailyTaskCompletion>,
 )
@@ -33,6 +35,8 @@ data class TaskInput(
     val startDate: String?,
     val endDate: String?,
     val type: TaskType,
+    val projectId: String? = null,
+    val stageId: String? = null,
 )
 
 /** Campos opcionais: o back só recebe o que for enviado (`UpdateTaskDTO`). */
@@ -43,6 +47,8 @@ data class TaskUpdate(
     val endDate: String? = null,
     val status: TaskStatus? = null,
     val completionDate: String? = null,
+    val projectId: String? = null,
+    val stageId: String? = null,
 )
 
 data class TaskPage(
@@ -80,12 +86,12 @@ data class Project(
 
 data class ProjectStage(val id: String, val name: String, val done: Boolean)
 
-data class ProjectMilestone(val id: String, val title: String, val dueDate: String)
+data class ProjectVersion(val id: String, val title: String, val dueDate: String)
 
 data class ProjectDetails(
     val project: Project,
     val stages: List<ProjectStage>,
-    val milestones: List<ProjectMilestone>,
+    val versions: List<ProjectVersion>,
 )
 
 data class AbntCheck(val label: String, val passed: Boolean)

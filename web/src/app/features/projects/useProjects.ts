@@ -1,6 +1,9 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { createMilestone as createMilestoneRequest, createProject as createProjectRequest, createStage as createStageRequest, getProjectDetails, getProjects, updateMilestone as updateMilestoneRequest, updateStage } from './projects.api'
+import { createProject as createProjectRequest, createStage as createStageRequest, createVersion as createVersionRequest, getProjectDetails, getProjects, updateStage, updateVersion as updateVersionRequest } from './projects.api'
+import { getTasksForProject } from '../tasks/tasks.api'
+import { isTaskDone } from '../tasks/calendar'
+import type { Task } from '../tasks/types'
 import type { Project, ProjectDetails } from './types'
 
 export function useProjects() {
@@ -10,11 +13,41 @@ export function useProjects() {
   const selectedId = ref<string | null>(null)
   const loading = ref(true)
   const savingStageId = ref<string | null>(null)
-  const savingMilestoneId = ref<string | null>(null)
+  const savingVersionId = ref<string | null>(null)
   const savingNewStage = ref(false)
-  const savingNewMilestone = ref(false)
+  const savingNewVersion = ref(false)
   const savingProject = ref(false)
   const error = ref<string | null>(null)
+  const projectTasks = ref<Task[]>([])
+  const tasksLoading = ref(false)
+  const tasksError = ref<string | null>(null)
+
+  const tasksByStage = computed(() => {
+    const map = new Map<string, Task[]>()
+    for (const task of projectTasks.value) {
+      const key = task.stageId ?? ''
+      const list = map.get(key)
+      if (list) list.push(task)
+      else map.set(key, [task])
+    }
+    return map
+  })
+
+  const stageTasks = (stageId: string) => tasksByStage.value.get(stageId) ?? []
+  const unassignedTasks = computed(() => tasksByStage.value.get('') ?? [])
+
+  const loadTasks = async (id: string) => {
+    tasksLoading.value = true
+    tasksError.value = null
+    try {
+      projectTasks.value = await getTasksForProject(id)
+    } catch {
+      projectTasks.value = []
+      tasksError.value = t('projectTasksLoadFailed')
+    } finally {
+      tasksLoading.value = false
+    }
+  }
 
   const load = async () => {
     try {
@@ -31,11 +64,15 @@ export function useProjects() {
 
   const selectProject = async (id: string) => {
     selectedId.value = id
+    projectTasks.value = []
+    tasksError.value = null
     try {
       details.value = await getProjectDetails(id)
     } catch {
       error.value = t('projectDetailsLoadFailed')
+      return
     }
+    await loadTasks(id)
   }
 
   const syncProgress = () => {
@@ -59,6 +96,7 @@ export function useProjects() {
       projects.value.unshift(created.project)
       details.value = created
       selectedId.value = created.project.id
+      projectTasks.value = []
       return true
     } catch {
       error.value = t('projectCreateFailed')
@@ -100,38 +138,63 @@ export function useProjects() {
     }
   }
 
-  const createMilestone = async (title: string, dueDate: string) => {
+  const createVersion = async (title: string, dueDate: string) => {
     if (!details.value || !selectedId.value || !title.trim() || !dueDate) return false
-    savingNewMilestone.value = true
+    savingNewVersion.value = true
     error.value = null
     try {
-      const milestone = await createMilestoneRequest(selectedId.value, title.trim(), new Date(dueDate).toISOString())
-      details.value.milestones.push(milestone)
+      const version = await createVersionRequest(selectedId.value, title.trim(), new Date(dueDate).toISOString())
+      details.value.versions.push(version)
       return true
     } catch {
-      error.value = t('milestoneCreateFailed')
+      error.value = t('versionCreateFailed')
       return false
     } finally {
-      savingNewMilestone.value = false
+      savingNewVersion.value = false
     }
   }
 
-  const updateMilestone = async (milestoneId: string, title: string, dueDate: string) => {
+  const updateVersion = async (versionId: string, title: string, dueDate: string) => {
     if (!details.value || !selectedId.value || !title.trim() || !dueDate) return false
-    const milestone = details.value.milestones.find(entry => entry.id === milestoneId)
-    if (!milestone) return false
-    savingMilestoneId.value = milestoneId
+    const version = details.value.versions.find(entry => entry.id === versionId)
+    if (!version) return false
+    savingVersionId.value = versionId
     error.value = null
     try {
-      Object.assign(milestone, await updateMilestoneRequest(selectedId.value, milestoneId, title.trim(), new Date(dueDate).toISOString()))
+      Object.assign(version, await updateVersionRequest(selectedId.value, versionId, title.trim(), new Date(dueDate).toISOString()))
       return true
     } catch {
-      error.value = t('milestoneSaveFailed')
+      error.value = t('versionSaveFailed')
       return false
     } finally {
-      savingMilestoneId.value = null
+      savingVersionId.value = null
     }
   }
 
-  return { projects, details, selectedId, loading, savingStageId, savingMilestoneId, savingNewStage, savingNewMilestone, savingProject, error, load, selectProject, createProject, createStage, createMilestone, toggleStage, updateMilestone }
+  return {
+    projects,
+    details,
+    selectedId,
+    loading,
+    savingStageId,
+    savingVersionId,
+    savingNewStage,
+    savingNewVersion,
+    savingProject,
+    error,
+    projectTasks,
+    tasksLoading,
+    tasksError,
+    stageTasks,
+    unassignedTasks,
+    isTaskDone,
+    load,
+    selectProject,
+    loadTasks,
+    createProject,
+    createStage,
+    createVersion,
+    toggleStage,
+    updateVersion
+  }
 }

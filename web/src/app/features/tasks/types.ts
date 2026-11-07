@@ -24,6 +24,8 @@ export interface Task {
   endDate: string | null
   type: TaskType
   status: TaskStatus
+  projectId: string | null
+  stageId: string | null
   dailyStatistics: DailyTaskStatistics | null
   dailyCompletions: DailyTaskCompletion[]
 }
@@ -34,6 +36,8 @@ export interface TaskInput {
   endDate: string | null
   type: TaskType
   status?: TaskStatus
+  projectId?: string | null
+  stageId?: string | null
 }
 
 // `UpdateTaskDTO`: todos os campos são opcionais. `completionDate` (date) diz qual dia da
@@ -45,6 +49,8 @@ export interface TaskUpdate {
   endDate?: string | null
   status?: TaskStatus
   completionDate?: string | null
+  projectId?: string | null
+  stageId?: string | null
 }
 
 export interface TaskPage {

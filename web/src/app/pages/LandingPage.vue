@@ -45,7 +45,7 @@ const goLogin = () => {
 <template>
   <div class="landing">
     <header class="landing-header">
-      <div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>StudyFlow</strong></div>
+      <div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>EHS Study</strong></div>
       <div class="header-actions"><LanguageToggle /><ThemeToggle /></div>
     </header>
     <main class="landing-hero">

@@ -76,6 +76,17 @@ export async function mockApi(page: Page, state: MockState) {
     await fulfill(route, { ...USER, email: body?.email ?? USER.email, token: 'test-token' })
   })
 
+  await page.route(url => url.pathname === '/tasks' || url.pathname.startsWith('/tasks/'), async route => {
+    if (route.request().method() === 'GET') {
+      return fulfill(route, { total: 0, page: 0, size: 100, items: [] })
+    }
+    return route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: `unmocked ${route.request().method()} ${new URL(route.request().url()).pathname}` })
+    })
+  })
+
   await page.route('**/study/**', async route => {
     const request = route.request()
     const url = new URL(request.url())
@@ -112,7 +123,7 @@ export async function mockApi(page: Page, state: MockState) {
       })
     }
 
-    if (path === '/study/projects/new' && method === 'POST') {
+    if (path === '/study/projects' && method === 'POST') {
       const body = request.postDataJSON() as { title: string; status: string; advisor: string | null }
       const project = {
         id: `project-${state.nextProjectId ?? 10}`,
@@ -121,7 +132,7 @@ export async function mockApi(page: Page, state: MockState) {
         progress: 0,
         advisor: body.advisor ?? '',
         stages: [],
-        milestone: []
+        versions: []
       }
       state.nextProjectId = (state.nextProjectId ?? 10) + 1
       state.projects ??= []
@@ -157,25 +168,25 @@ export async function mockApi(page: Page, state: MockState) {
       return fulfill(route, stage)
     }
 
-    const milestoneMatch = path.match(/^\/study\/project\/milestone\/([^/]+)$/)
-    if (milestoneMatch && method === 'PUT') {
-      const milestoneId = milestoneMatch[1]
+    const versionMatch = path.match(/^\/study\/project\/version\/([^/]+)$/)
+    if (versionMatch && method === 'PUT') {
+      const versionId = versionMatch[1]
       const body = request.postDataJSON() as { idProject: string; title: string; dueDate: string }
-      const project = state.projectDetails?.[body.idProject] as { milestone?: Array<{ id: string; title: string; dueDate: string }> } | undefined
-      const milestone = project?.milestone?.find(entry => entry.id === milestoneId)
-      if (!milestone) return fulfill(route, null, 404)
-      Object.assign(milestone, { title: body.title, dueDate: body.dueDate })
-      return fulfill(route, milestone)
+      const project = state.projectDetails?.[body.idProject] as { versions?: Array<{ id: string; title: string; dueDate: string }> } | undefined
+      const version = project?.versions?.find(entry => entry.id === versionId)
+      if (!version) return fulfill(route, null, 404)
+      Object.assign(version, { title: body.title, dueDate: body.dueDate })
+      return fulfill(route, version)
     }
 
-    if (path === '/study/project/milestone' && method === 'POST') {
+    if (path === '/study/project/version' && method === 'POST') {
       const body = request.postDataJSON() as { idProject: string; title: string; dueDate: string }
-      const project = state.projectDetails?.[body.idProject] as { milestone?: Array<{ id: string; title: string; dueDate: string }> } | undefined
+      const project = state.projectDetails?.[body.idProject] as { versions?: Array<{ id: string; title: string; dueDate: string }> } | undefined
       if (!project) return fulfill(route, null, 404)
-      project.milestone ??= []
-      const milestone = { id: `milestone-${Date.now()}`, title: body.title, dueDate: body.dueDate }
-      project.milestone.push(milestone)
-      return fulfill(route, milestone)
+      project.versions ??= []
+      const version = { id: `version-${Date.now()}`, title: body.title, dueDate: body.dueDate }
+      project.versions.push(version)
+      return fulfill(route, version)
     }
 
     if (path === '/study/notes/folders' && method === 'GET') {
