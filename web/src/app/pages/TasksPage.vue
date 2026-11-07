@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import LanguageToggle from '../components/LanguageToggle.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
@@ -14,8 +14,15 @@ import type { Task } from '../features/tasks/types'
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
 const { student } = useStudentProfile()
-const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, remove, toggleForm, create } = useTasks()
+const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, remove, toggleForm, create, openEdit, submitForm } = useTasks()
 onMounted(load)
+
+const formEl = ref<HTMLFormElement | null>(null)
+const startEdit = async (task: Task) => {
+  openEdit(task)
+  await nextTick()
+  formEl.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
 
 const WEEKDAYS = computed(() => {
   const fmt = new Intl.DateTimeFormat(locale.value, { weekday: 'narrow' })
@@ -77,11 +84,15 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
     </article>
 
     <article class="card task-page">
-      <form v-if="formOpen" class="task-form" @submit.prevent="create">
+      <form v-if="formOpen" ref="formEl" class="task-form" @submit.prevent="submitForm">
+        <header v-if="editingId" class="task-form-header">
+          <strong>{{ t('editTaskTitle') }}</strong>
+          <small v-if="editingTask">{{ editingTask.title }}</small>
+        </header>
         <label class="field"><span>{{ t('taskTitleLabel') }}</span><input v-model="title" type="text" :placeholder="t('taskTitlePlaceholder')" required /></label>
         <div class="task-form-row">
           <label class="field"><span>{{ t('taskTypeLabel') }}</span><select v-model="type" class="select"><option value="UNIQUE">{{ t('taskTypeUnique') }}</option><option value="DAILY">{{ t('taskTypeDaily') }}</option></select></label>
-          <label v-if="type === 'UNIQUE'" class="field"><span>{{ t('taskStartDateLabel') }}</span><input v-model="startDate" type="datetime-local" /></label>
+          <label v-if="type === 'UNIQUE' || editingId" class="field"><span>{{ t('taskStartDateLabel') }}</span><input v-model="startDate" type="datetime-local" /></label>
           <label class="field"><span>{{ t('taskEndDateLabel') }}</span><input v-model="endDate" type="datetime-local" /></label>
         </div>
         <div class="task-form-row">
@@ -89,11 +100,12 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
           <label class="field"><span>{{ t('taskStageLabel') }}</span><select v-model="stageId" class="select" :disabled="!projectId || !stages.length"><option value="">{{ t('taskStageNone') }}</option><option v-for="stage in stages" :key="stage.id" :value="stage.id">{{ stage.name }}</option></select></label>
         </div>
         <p v-if="formError" class="form-error">{{ formError }}</p>
-        <div class="task-form-actions"><button class="button" type="submit" :disabled="creating">{{ creating ? t('saving') : t('taskSaveAction') }}</button><button class="button secondary" type="button" :disabled="creating" @click="toggleForm">{{ t('cancelAction') }}</button></div>
+        <div class="task-form-actions"><button class="button" type="submit" :disabled="creating || updating">{{ creating || updating ? t('saving') : editingId ? t('saveChangesAction') : t('taskSaveAction') }}</button><button class="button secondary" type="button" :disabled="creating || updating" @click="toggleForm">{{ t('cancelAction') }}</button></div>
       </form>
       <p v-if="!items.length && !error" class="empty-note">{{ t('noTasks') }}</p>
       <div v-for="item in items" :key="item.id" class="task-line">
         <button class="task-row" :disabled="savingId === item.id" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatTaskPeriod(item.startDate, item.endDate) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
+        <button class="task-edit" :aria-label="t('taskEditAction')" @click="startEdit(item)">✎</button>
         <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>
       </div>
       <button class="floating-add" :aria-expanded="formOpen" @click="toggleForm">＋</button>

@@ -62,13 +62,18 @@ test('cria pasta pela UI e persiste no back real', async ({ page, request }) => 
     await signIn(page)
     await openNotes(page)
 
-    await page.getByRole('button', { name: '＋' }).click()
-    await expect(page.getByRole('button', { name: /Nova pasta \d+/ })).toBeVisible()
+    await page.getByRole('button', { name: '＋', exact: true }).click()
+    // Espera a pasta aparecer no back: uma pasta "Nova pasta N" deixada por execução anterior
+    // faria a checagem visual passar antes do POST concluir.
+    await expect
+      .poll(async () => (await listFolders(request, token)).find(folder => !before.has(folder.id))?.id)
+      .toBeTruthy()
 
     const newFolder = (await listFolders(request, token)).find(folder => !before.has(folder.id))
     expect(newFolder).toBeTruthy()
     if (!newFolder) return
     createdId = newFolder.id
+    await expect(page.getByRole('button', { name: new RegExp(newFolder.name) })).toBeVisible()
     await page.getByRole('button', { name: 'Renomear pasta' }).last().click()
     await page.getByRole('textbox', { name: 'Nome da pasta' }).fill(`Renomeada ${uniqueSuffix()}`)
     const renamed = await page.getByRole('textbox', { name: 'Nome da pasta' }).inputValue()

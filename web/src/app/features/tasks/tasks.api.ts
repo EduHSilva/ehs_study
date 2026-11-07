@@ -31,6 +31,7 @@ interface TaskPayload {
   endDate?: string | null
   type?: string | null
   status?: string | null
+  completedDate?: string | null
   projectId?: string | null
   stageId?: string | null
   dailyStatistics?: DailyStatsPayload | null
@@ -92,6 +93,7 @@ function toTask(payload: TaskPayload): Task {
     endDate: payload.endDate ?? null,
     type: toType(payload.type),
     status: toStatus(payload.status),
+    completedDate: payload.completedDate ?? null,
     projectId: payload.projectId ?? null,
     stageId: payload.stageId ?? null,
     dailyStatistics: toDailyStats(payload.dailyStatistics),
