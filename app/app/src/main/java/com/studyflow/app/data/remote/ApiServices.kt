@@ -31,6 +31,8 @@ interface TasksApi {
         @Query("size") size: Int,
         @Query("start") start: String? = null,
         @Query("end") end: String? = null,
+        @Query("projectId") projectId: String? = null,
+        @Query("stageId") stageId: String? = null,
     ): Envelope<TaskPageDto>
 
     @POST("tasks")
@@ -96,7 +98,7 @@ interface ProjectsApi {
     @GET("study/projects/{id}")
     suspend fun details(@Path("id") id: String): Envelope<ProjectDto>
 
-    @POST("study/projects/new")
+    @POST("study/projects")
     suspend fun create(@Body body: CreateProjectRequest): Envelope<ProjectDto>
 
     @POST("study/project/stage")
@@ -105,11 +107,11 @@ interface ProjectsApi {
     @PUT("study/project/stage/{id}")
     suspend fun updateStage(@Path("id") id: String, @Body body: StageRequest): Envelope<StageDto>
 
-    @POST("study/project/milestone")
-    suspend fun createMilestone(@Body body: MilestoneRequest): Envelope<MilestoneDto>
+    @POST("study/project/version")
+    suspend fun createVersion(@Body body: VersionRequest): Envelope<VersionDto>
 
-    @PUT("study/project/milestone/{id}")
-    suspend fun updateMilestone(@Path("id") id: String, @Body body: MilestoneRequest): Envelope<MilestoneDto>
+    @PUT("study/project/version/{id}")
+    suspend fun updateVersion(@Path("id") id: String, @Body body: VersionRequest): Envelope<VersionDto>
 }
 
 interface ReviewApi {

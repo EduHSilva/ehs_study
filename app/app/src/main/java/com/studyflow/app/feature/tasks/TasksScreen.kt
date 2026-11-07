@@ -62,6 +62,7 @@ import com.studyflow.app.core.ui.components.DateTimeField
 import com.studyflow.app.core.ui.components.EmptyNote
 import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LoadingScreen
+import com.studyflow.app.core.ui.components.PickerField
 import com.studyflow.app.core.ui.components.SegmentedToggle
 import com.studyflow.app.core.ui.components.Subtitle
 import com.studyflow.app.core.ui.components.Tag
@@ -80,7 +81,7 @@ import java.time.format.TextStyle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen() {
-    val vm: TasksViewModel = appViewModel { TasksViewModel(it.tasksRepository) }
+    val vm: TasksViewModel = appViewModel { TasksViewModel(it.tasksRepository, it.projectsRepository) }
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStrings.current
 
@@ -140,6 +141,26 @@ fun TasksScreen() {
                     value = endDate,
                     onChange = { endDate = it },
                 )
+                PickerField(
+                    label = s["taskProjectLabel"],
+                    value = state.projects.firstOrNull { it.id == state.formProjectId }?.title
+                        ?: s["taskProjectNone"],
+                    options = listOf(s["taskProjectNone"]) + state.projects.map { it.title },
+                    onSelect = { index ->
+                        vm.selectFormProject(if (index == 0) null else state.projects[index - 1].id)
+                    },
+                )
+                if (state.formProjectId != null && state.formStages.isNotEmpty()) {
+                    PickerField(
+                        label = s["taskStageLabel"],
+                        value = state.formStages.firstOrNull { it.id == state.formStageId }?.name
+                            ?: s["taskStageNone"],
+                        options = listOf(s["taskStageNone"]) + state.formStages.map { it.name },
+                        onSelect = { index ->
+                            vm.selectFormStage(if (index == 0) null else state.formStages[index - 1].id)
+                        },
+                    )
+                }
                 if (state.formErrorKey != null) {
                     ErrorBanner(message = s[state.formErrorKey!!])
                 }
@@ -229,6 +250,10 @@ fun TasksScreen() {
                                     deleting = state.deletingId == task.id,
                                     selectedDay = state.selectedDay,
                                     todayKey = state.todayKey,
+                                    projectName = state.projects.firstOrNull { it.id == task.projectId }?.title,
+                                    stageName = task.projectId?.let { pid ->
+                                        state.stagesByProject[pid]?.firstOrNull { it.id == task.stageId }?.name
+                                    },
                                     onToggle = { vm.toggle(task.id) },
                                     onDelete = { vm.remove(task.id) },
                                 )
@@ -473,6 +498,8 @@ private fun TaskRow(
     deleting: Boolean,
     selectedDay: String?,
     todayKey: String,
+    projectName: String?,
+    stageName: String?,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -510,6 +537,14 @@ private fun TaskRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = StudyFlowTheme.colors.subtle,
                 )
+                val link = listOfNotNull(projectName, stageName).joinToString(" · ")
+                if (link.isNotBlank()) {
+                    Text(
+                        link,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StudyFlowTheme.colors.subtle,
+                    )
+                }
                 if (completedDays > 0) {
                     Text(
                         s.format("taskDailyDoneCount", "count" to completedDays),

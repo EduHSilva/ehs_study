@@ -3,13 +3,15 @@ import { useI18n } from '../../composables/useI18n'
 import { createFocusSession, getTodaySessions } from './pomodoro.api'
 import type { FocusSession } from './types'
 
+// Estado de módulo: a página do Pomodoro e o widget flutuante compartilham a mesma lista de
+// sessões, então finalizar o ciclo pelo widget atualiza os contadores em qualquer tela.
+const sessions = ref<FocusSession[]>([])
+const loading = ref(true)
+const saving = ref(false)
+const error = ref<string | null>(null)
+
 export function usePomodoro() {
   const { t } = useI18n()
-  const sessions = ref<FocusSession[]>([])
-  const loading = ref(true)
-  const saving = ref(false)
-  const error = ref<string | null>(null)
-
   const totalMinutes = computed(() => sessions.value.reduce((sum, session) => sum + session.minutes, 0))
 
   const load = async () => {

@@ -4,7 +4,7 @@ import type { Project, ProjectDetails, ProjectStage } from './types'
 
 const LIST_PAGE_SIZE = 100
 
-interface ProjectMilestonePayload {
+interface ProjectVersionPayload {
   id: string
   title: string
   dueDate: string
@@ -24,7 +24,7 @@ interface ProjectPayload {
   progress?: number | null
   advisor?: string | null
   stages?: ProjectStagePayload[] | null
-  milestone?: ProjectMilestonePayload[] | null
+  versions?: ProjectVersionPayload[] | null
 }
 
 interface ProjectPagePayload {
@@ -55,10 +55,10 @@ function toProjectDetails(payload: ProjectPayload): ProjectDetails {
   return {
     project: toProject(payload),
     stages: (payload.stages ?? []).map(stage => ({ id: stage.id, name: stage.name ?? stage.title ?? '', done: stage.done === true })),
-    milestones: (payload.milestone ?? []).map(milestone => ({
-      id: milestone.id,
-      title: milestone.title,
-      dueDate: milestone.dueDate
+    versions: (payload.versions ?? []).map(version => ({
+      id: version.id,
+      title: version.title,
+      dueDate: version.dueDate
     }))
   }
 }
@@ -74,7 +74,7 @@ export async function getProjectDetails(id: string): Promise<ProjectDetails> {
 }
 
 export async function createProject(title: string, advisor: string): Promise<ProjectDetails> {
-  const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>('/study/projects/new', {
+  const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>('/study/projects', {
     method: 'POST',
     body: JSON.stringify({ title, status: 'WAITING', advisor: advisor || null })
   }))
@@ -89,8 +89,8 @@ export async function createStage(projectId: string, title: string): Promise<Pro
   return { id: payload.id, name: payload.name ?? payload.title ?? title, done: payload.done === true }
 }
 
-export async function createMilestone(projectId: string, title: string, dueDate: string): Promise<ProjectMilestonePayload> {
-  return unwrap(await httpClient<DefaultResponse<ProjectMilestonePayload>>('/study/project/milestone', {
+export async function createVersion(projectId: string, title: string, dueDate: string): Promise<ProjectVersionPayload> {
+  return unwrap(await httpClient<DefaultResponse<ProjectVersionPayload>>('/study/project/version', {
     method: 'POST',
     body: JSON.stringify({ idProject: projectId, title, dueDate })
   }))
@@ -104,8 +104,8 @@ export async function updateStage(projectId: string, stageId: string, title: str
   return { id: payload.id, name: payload.name ?? payload.title ?? title, done: payload.done === true }
 }
 
-export async function updateMilestone(projectId: string, milestoneId: string, title: string, dueDate: string): Promise<ProjectMilestonePayload> {
-  return unwrap(await httpClient<DefaultResponse<ProjectMilestonePayload>>(`/study/project/milestone/${milestoneId}`, {
+export async function updateVersion(projectId: string, versionId: string, title: string, dueDate: string): Promise<ProjectVersionPayload> {
+  return unwrap(await httpClient<DefaultResponse<ProjectVersionPayload>>(`/study/project/version/${versionId}`, {
     method: 'PUT',
     body: JSON.stringify({ idProject: projectId, title, dueDate })
   }))

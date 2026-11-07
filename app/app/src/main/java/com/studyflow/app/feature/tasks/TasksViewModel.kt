@@ -3,11 +3,14 @@ package com.studyflow.app.feature.tasks
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.studyflow.app.data.model.DailyTaskCompletion
+import com.studyflow.app.data.model.Project
+import com.studyflow.app.data.model.ProjectStage
 import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.model.TaskInput
 import com.studyflow.app.data.model.TaskStatus
 import com.studyflow.app.data.model.TaskType
 import com.studyflow.app.data.model.TaskUpdate
+import com.studyflow.app.data.repository.ProjectsRepository
 import com.studyflow.app.data.repository.TasksRepository
 import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
@@ -42,15 +45,21 @@ data class TasksUiState(
     val formOpen: Boolean = false,
     val creating: Boolean = false,
     val formErrorKey: String? = null,
+    val projects: List<Project> = emptyList(),
+    val stagesByProject: Map<String, List<ProjectStage>> = emptyMap(),
+    val formProjectId: String? = null,
+    val formStageId: String? = null,
 ) {
     val lastPage: Int get() = maxOf(0, (total + TASKS_PAGE_SIZE - 1) / TASKS_PAGE_SIZE - 1)
     val canGoPrev: Boolean get() = page > 0
     val canGoNext: Boolean get() = page < lastPage
     val targetDay: String get() = selectedDay ?: todayKey
+    val formStages: List<ProjectStage> get() = formProjectId?.let { stagesByProject[it] }.orEmpty()
 }
 
 class TasksViewModel(
     private val tasksRepository: TasksRepository,
+    private val projectsRepository: ProjectsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TasksUiState())
@@ -64,11 +73,30 @@ class TasksViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, calendarLoading = true) }
             try {
+                loadProjectOptions()
                 refreshInternal()
             } finally {
                 _state.update { it.copy(loading = false, calendarLoading = false) }
             }
         }
+    }
+
+    private suspend fun loadProjectOptions() {
+        val projects = runCatching { projectsRepository.getProjects() }.getOrDefault(emptyList())
+        _state.update { it.copy(projects = projects) }
+    }
+
+    fun selectFormProject(id: String?) {
+        _state.update { it.copy(formProjectId = id, formStageId = null) }
+        if (id == null || _state.value.stagesByProject.containsKey(id)) return
+        viewModelScope.launch {
+            val stages = runCatching { projectsRepository.getProjectDetails(id).stages }.getOrDefault(emptyList())
+            _state.update { it.copy(stagesByProject = it.stagesByProject + (id to stages)) }
+        }
+    }
+
+    fun selectFormStage(id: String?) {
+        _state.update { it.copy(formStageId = id) }
     }
 
     fun refresh() {
@@ -79,6 +107,7 @@ class TasksViewModel(
         _state.update { it.copy(pageLoading = true, errorKey = null) }
         try {
             fetchPeriod()
+            resolveStageCache()
             applyFilter()
         } catch (e: CancellationException) {
             throw e
@@ -94,6 +123,22 @@ class TasksViewModel(
         val (from, to) = StudyCalendar.gridRangeFor(current.anchor, current.mode)
         val tasks = tasksRepository.getTasksInRange(from, to)
         _state.update { it.copy(periodTasks = tasks) }
+    }
+
+    // Nomes de etapa das tags da lista: só o detalhe do projeto traz as etapas.
+    private suspend fun resolveStageCache() {
+        val current = _state.value
+        val missing = current.periodTasks
+            .mapNotNull { it.projectId }
+            .distinct()
+            .filterNot { current.stagesByProject.containsKey(it) }
+        if (missing.isEmpty()) return
+        var cache = current.stagesByProject
+        for (id in missing) {
+            val stages = runCatching { projectsRepository.getProjectDetails(id).stages }.getOrDefault(emptyList())
+            cache = cache + (id to stages)
+        }
+        _state.update { it.copy(stagesByProject = cache) }
     }
 
     private fun paginate(all: List<Task>) {
@@ -245,12 +290,16 @@ class TasksViewModel(
             _state.update { it.copy(creating = true, formErrorKey = null) }
             try {
                 val endIso = end?.let(ApiDates::toIso)
+                val linkProject = current.formProjectId
+                val linkStage = current.formProjectId?.let { current.formStageId }
                 val input = if (type == TaskType.DAILY) {
                     TaskInput(
                         title = trimmed,
                         startDate = start?.let(ApiDates::toIso) ?: Instant.now().toString(),
                         endDate = endIso,
                         type = TaskType.DAILY,
+                        projectId = linkProject,
+                        stageId = linkStage,
                     )
                 } else {
                     TaskInput(
@@ -258,6 +307,8 @@ class TasksViewModel(
                         startDate = start?.let(ApiDates::toIso) ?: endIso,
                         endDate = endIso,
                         type = TaskType.UNIQUE,
+                        projectId = linkProject,
+                        stageId = linkStage,
                     )
                 }
                 val focusDay = ApiDates.dayKeyFrom(input.startDate ?: input.endDate ?: Instant.now().toString())
@@ -274,6 +325,8 @@ class TasksViewModel(
                         page = 0,
                         formOpen = false,
                         formErrorKey = null,
+                        formProjectId = null,
+                        formStageId = null,
                     )
                 }
                 fetchPeriod()

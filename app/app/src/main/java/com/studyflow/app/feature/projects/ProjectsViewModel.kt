@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectDetails
+import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.repository.ProjectsRepository
+import com.studyflow.app.data.repository.TasksRepository
 import com.studyflow.app.domain.ApiDates
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 data class ProjectsUiState(
@@ -80,17 +83,22 @@ class ProjectsViewModel(
 
 data class ProjectDetailUiState(
     val details: ProjectDetails? = null,
+    val tasks: List<Task> = emptyList(),
     val loading: Boolean = true,
+    val tasksLoading: Boolean = false,
     val errorKey: String? = null,
+    val tasksErrorKey: String? = null,
     val savingStageId: String? = null,
-    val savingMilestoneId: String? = null,
+    val savingVersionId: String? = null,
     val savingNewStage: Boolean = false,
-    val savingNewMilestone: Boolean = false,
+    val savingNewVersion: Boolean = false,
+    val todayKey: String = LocalDate.now().toString(),
 )
 
 class ProjectDetailViewModel(
     private val projectId: String,
     private val projectsRepository: ProjectsRepository,
+    private val tasksRepository: TasksRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProjectDetailUiState())
@@ -110,6 +118,24 @@ class ProjectDetailViewModel(
                 throw e
             } catch (_: Exception) {
                 _state.update { it.copy(loading = false, errorKey = "projectDetailsLoadFailed") }
+                return@launch
+            }
+            loadTasks()
+        }
+    }
+
+    fun loadTasks() {
+        viewModelScope.launch {
+            _state.update { it.copy(tasksLoading = true, tasksErrorKey = null) }
+            try {
+                val tasks = tasksRepository.getTasksForProject(projectId)
+                _state.update { it.copy(tasks = tasks) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(tasks = emptyList(), tasksErrorKey = "projectTasksLoadFailed") }
+            } finally {
+                _state.update { it.copy(tasksLoading = false) }
             }
         }
     }
@@ -154,42 +180,42 @@ class ProjectDetailViewModel(
         }
     }
 
-    fun createMilestone(title: String, dueDate: LocalDateTime?) {
+    fun createVersion(title: String, dueDate: LocalDateTime?) {
         val trimmed = title.trim()
         if (trimmed.isEmpty() || dueDate == null || _state.value.details == null) return
-        if (_state.value.savingNewMilestone) return
-        _state.update { it.copy(savingNewMilestone = true, errorKey = null) }
+        if (_state.value.savingNewVersion) return
+        _state.update { it.copy(savingNewVersion = true, errorKey = null) }
         viewModelScope.launch {
             try {
-                val milestone = projectsRepository.createMilestone(projectId, trimmed, ApiDates.toIso(dueDate))
-                updateDetails { it.copy(milestones = it.milestones + milestone) }
+                val version = projectsRepository.createVersion(projectId, trimmed, ApiDates.toIso(dueDate))
+                updateDetails { it.copy(versions = it.versions + version) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(errorKey = "milestoneCreateFailed") }
+                _state.update { it.copy(errorKey = "versionCreateFailed") }
             } finally {
-                _state.update { it.copy(savingNewMilestone = false) }
+                _state.update { it.copy(savingNewVersion = false) }
             }
         }
     }
 
-    fun updateMilestone(id: String, title: String, dueDate: LocalDateTime?) {
+    fun updateVersion(id: String, title: String, dueDate: LocalDateTime?) {
         val trimmed = title.trim()
         if (trimmed.isEmpty() || dueDate == null) return
-        if (_state.value.savingMilestoneId == id) return
-        _state.update { it.copy(savingMilestoneId = id, errorKey = null) }
+        if (_state.value.savingVersionId == id) return
+        _state.update { it.copy(savingVersionId = id, errorKey = null) }
         viewModelScope.launch {
             try {
-                val saved = projectsRepository.updateMilestone(projectId, id, trimmed, ApiDates.toIso(dueDate))
+                val saved = projectsRepository.updateVersion(projectId, id, trimmed, ApiDates.toIso(dueDate))
                 updateDetails { details ->
-                    details.copy(milestones = details.milestones.map { if (it.id == id) saved else it })
+                    details.copy(versions = details.versions.map { if (it.id == id) saved else it })
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(errorKey = "milestoneSaveFailed") }
+                _state.update { it.copy(errorKey = "versionSaveFailed") }
             } finally {
-                _state.update { it.copy(savingMilestoneId = null) }
+                _state.update { it.copy(savingVersionId = null) }
             }
         }
     }

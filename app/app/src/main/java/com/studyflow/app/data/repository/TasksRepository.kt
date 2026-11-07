@@ -58,11 +58,17 @@ class TasksRepository(private val api: TasksApi) {
         }
     }
 
-    private suspend fun fetchAllPages(start: String?, end: String?): List<Task> {
+    private suspend fun fetchAllPages(start: String?, end: String?, projectId: String? = null): List<Task> {
         val collected = ArrayList<Task>()
         var page = 0
         while (true) {
-            val payload = api.list(page = page, size = RANGE_PAGE_SIZE, start = start, end = end).unwrap()
+            val payload = api.list(
+                page = page,
+                size = RANGE_PAGE_SIZE,
+                start = start,
+                end = end,
+                projectId = projectId,
+            ).unwrap()
             val items = payload.items.orEmpty().map { Mappers.task(it) }
             collected += items
             val total = payload.total ?: collected.size
@@ -72,6 +78,16 @@ class TasksRepository(private val api: TasksApi) {
         return collected
     }
 
+    suspend fun getTasksForProject(projectId: String): List<Task> {
+        val today = LocalDate.now()
+        val tasks = fetchAllPages(
+            start = LocalDate.of(today.year - 2, 1, 1).toString(),
+            end = LocalDate.of(today.year + 2, 12, 31).toString(),
+            projectId = projectId,
+        )
+        return tasks.filter { it.status != TaskStatus.DELETED }
+    }
+
     suspend fun create(input: TaskInput): Task {
         val payload = api.create(
             CreateTaskRequest(
@@ -79,6 +95,8 @@ class TasksRepository(private val api: TasksApi) {
                 startDate = input.startDate,
                 endDate = input.endDate,
                 type = input.type.name,
+                projectId = input.projectId,
+                stageId = input.stageId,
             ),
         ).unwrap()
         return Mappers.task(payload)
@@ -94,6 +112,8 @@ class TasksRepository(private val api: TasksApi) {
                 endDate = update.endDate,
                 status = update.status?.name,
                 completionDate = update.completionDate,
+                projectId = update.projectId,
+                stageId = update.stageId,
             ),
         ).unwrap()
         return Mappers.task(payload)

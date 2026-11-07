@@ -31,6 +31,8 @@ interface TaskPayload {
   endDate?: string | null
   type?: string | null
   status?: string | null
+  projectId?: string | null
+  stageId?: string | null
   dailyStatistics?: DailyStatsPayload | null
   dailyCompletions?: DailyCompletionPayload[] | null
 }
@@ -90,6 +92,8 @@ function toTask(payload: TaskPayload): Task {
     endDate: payload.endDate ?? null,
     type: toType(payload.type),
     status: toStatus(payload.status),
+    projectId: payload.projectId ?? null,
+    stageId: payload.stageId ?? null,
     dailyStatistics: toDailyStats(payload.dailyStatistics),
     dailyCompletions: toDailyCompletions(payload.dailyCompletions)
   }
@@ -165,6 +169,16 @@ export async function getTasksInRange(from: Date, to: Date, size = RANGE_PAGE_SI
   })
 }
 
+export async function getTasksForProject(projectId: string, size = RANGE_PAGE_SIZE): Promise<Task[]> {
+  // O filtro de período é obrigatório para o back não truncar em [hoje, +7 dias]; usamos uma
+  // janela larga porque as tarefas do projeto podem estar em qualquer data.
+  const today = new Date()
+  const wideFrom = dayKey(new Date(today.getFullYear() - 2, 0, 1))
+  const wideTo = dayKey(new Date(today.getFullYear() + 2, 11, 31))
+  const tasks = await fetchAllPages(`&start=${wideFrom}&end=${wideTo}&projectId=${encodeURIComponent(projectId)}`, size)
+  return tasks.filter(task => task.status !== 'DELETED')
+}
+
 export async function createTask(input: TaskInput): Promise<Task> {
   const res = await httpClient<DefaultResponse<TaskPayload>>('/tasks', {
     method: 'POST',
@@ -173,7 +187,9 @@ export async function createTask(input: TaskInput): Promise<Task> {
       title: input.title,
       startDate: input.startDate,
       endDate: input.endDate,
-      type: input.type
+      type: input.type,
+      projectId: input.projectId ?? null,
+      stageId: input.stageId ?? null
     })
   })
   return toTask(unwrap(res))
@@ -188,6 +204,8 @@ export async function updateTask(input: TaskUpdate & { id: string }): Promise<Ta
   if (input.endDate !== undefined) body.endDate = input.endDate
   if (input.status !== undefined) body.status = input.status
   if (input.completionDate) body.completionDate = input.completionDate
+  if (input.projectId !== undefined) body.projectId = input.projectId
+  if (input.stageId !== undefined) body.stageId = input.stageId
   const res = await httpClient<DefaultResponse<TaskPayload>>(`/tasks/${input.id}`, {
     method: 'PUT',
     headers: taskHeaders(),

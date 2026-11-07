@@ -33,6 +33,8 @@ function toTask(raw: unknown, index: number): Task | null {
     endDate: endDate ?? legacyDate ?? schedule,
     type: item.type === 'DAILY' ? 'DAILY' : 'UNIQUE',
     status: readStatus(item),
+    projectId: typeof item.projectId === 'string' ? item.projectId : null,
+    stageId: typeof item.stageId === 'string' ? item.stageId : null,
     dailyStatistics: null,
     dailyCompletions: []
   }

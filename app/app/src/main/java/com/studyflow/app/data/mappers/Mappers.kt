@@ -10,7 +10,7 @@ import com.studyflow.app.data.model.NoteFolder
 import com.studyflow.app.data.model.NotePreview
 import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectDetails
-import com.studyflow.app.data.model.ProjectMilestone
+import com.studyflow.app.data.model.ProjectVersion
 import com.studyflow.app.data.model.ProjectStage
 import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.data.model.ReferenceCheck
@@ -25,7 +25,7 @@ import com.studyflow.app.data.remote.DailyCompletionDto
 import com.studyflow.app.data.remote.DailyStatsDto
 import com.studyflow.app.data.remote.FocusSessionDto
 import com.studyflow.app.data.remote.FolderDto
-import com.studyflow.app.data.remote.MilestoneDto
+import com.studyflow.app.data.remote.VersionDto
 import com.studyflow.app.data.remote.NoteDto
 import com.studyflow.app.data.remote.ProjectDto
 import com.studyflow.app.data.remote.ReviewReportDto
@@ -76,6 +76,8 @@ object Mappers {
             endDate = endDate,
             type = toType(dto.type),
             status = status,
+            projectId = dto.projectId,
+            stageId = dto.stageId,
             dailyStatistics = toStats(dto.dailyStatistics),
             dailyCompletions = toCompletions(dto.dailyCompletions),
         )
@@ -119,7 +121,7 @@ object Mappers {
     fun projectDetails(dto: ProjectDto): ProjectDetails = ProjectDetails(
         project = project(dto),
         stages = dto.stages.orEmpty().map(::stage),
-        milestones = dto.milestone.orEmpty().map(::milestone),
+        versions = dto.versions.orEmpty().map(::version),
     )
 
     fun stage(dto: StageDto): ProjectStage = ProjectStage(
@@ -128,7 +130,7 @@ object Mappers {
         done = dto.done == true,
     )
 
-    fun milestone(dto: MilestoneDto): ProjectMilestone = ProjectMilestone(
+    fun version(dto: VersionDto): ProjectVersion = ProjectVersion(
         id = dto.id,
         title = dto.title,
         dueDate = dto.dueDate,
