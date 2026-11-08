@@ -81,8 +81,23 @@ export async function createProject(title: string, advisor: string): Promise<Pro
   return toProjectDetails(payload)
 }
 
-export async function createStage(projectId: string, title: string): Promise<ProjectStage> {
-  const payload = unwrap(await httpClient<DefaultResponse<ProjectStagePayload>>('/study/project/stage', {
+// `status` ausente preserva o status atual no back; `advisor` nulo limpa o responsável.
+export async function updateProject(
+  id: string,
+  input: { title: string; advisor: string; status?: 'WAITING' | 'DONE' }
+): Promise<ProjectDetails> {
+  const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>(`/study/projects/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title: input.title, advisor: input.advisor || null, ...(input.status ? { status: input.status } : {}) })
+  }))
+  return toProjectDetails(payload)
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await httpClient<DefaultResponse<null>>(`/study/projects/${id}`, { method: 'DELETE' })
+}
+
+export async function createStage(projectId: string, title: string): Promise<ProjectStage> {  const payload = unwrap(await httpClient<DefaultResponse<ProjectStagePayload>>('/study/project/stage', {
     method: 'POST',
     body: JSON.stringify({ idProject: projectId, title, done: false })
   }))

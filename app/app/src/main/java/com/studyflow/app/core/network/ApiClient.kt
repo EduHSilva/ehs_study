@@ -10,6 +10,7 @@ import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 /**
@@ -53,6 +54,9 @@ class ApiClient(
             sessionManager.token?.let { builder.header("Authorization", "Bearer $it") }
             if (original.url.encodedPath.startsWith("/tasks")) {
                 sessionManager.userId?.let { builder.header("X-User-ID", it) }
+                // O back resolve os dias de calendário no fuso do cliente; sem isso a diária
+                // criada à noite começa no dia seguinte (UTC) e a conclusão é recusada.
+                builder.header("X-Time-Zone", TimeZone.getDefault().id)
             }
             val response = chain.proceed(builder.build())
             if (response.code == 401) sessionManager.expire()

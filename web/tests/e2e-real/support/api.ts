@@ -100,6 +100,7 @@ export interface ApiTask {
   completedDate: string | null
   projectId: string | null
   stageId: string | null
+  dailyCompletions?: Array<{ completionDate: string; completedAt: string | null }>
 }
 
 export interface ApiTaskInput {
@@ -115,8 +116,9 @@ export async function createTask(request: APIRequestContext, token: string, data
   return body<ApiTask>(await request.post(`${API_BASE_URL}/tasks`, { headers: auth(token), data }))
 }
 
-export async function getTask(request: APIRequestContext, token: string, id: string): Promise<ApiTask> {
-  return body<ApiTask>(await request.get(`${API_BASE_URL}/tasks/${id}`, { headers: auth(token) }))
+export async function getTask(request: APIRequestContext, token: string, id: string, timeZone?: string): Promise<ApiTask> {
+  const headers = Object.assign(auth(token), timeZone ? { 'X-Time-Zone': timeZone } : {})
+  return body<ApiTask>(await request.get(`${API_BASE_URL}/tasks/${id}`, { headers }))
 }
 
 export async function deleteTaskQuietly(request: APIRequestContext, token: string, id: string): Promise<void> {
@@ -125,4 +127,34 @@ export async function deleteTaskQuietly(request: APIRequestContext, token: strin
 
 export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+export interface ApiProject {
+  id: string
+  title: string
+  status: string
+  advisor: string
+  progress?: number
+  stages?: Array<{ id: string; name: string; done: boolean }>
+  versions?: Array<{ id: string; title: string; dueDate: string }>
+}
+
+export async function createProject(
+  request: APIRequestContext,
+  token: string,
+  title: string,
+  advisor: string
+): Promise<ApiProject> {
+  return body<ApiProject>(await request.post(`${API_BASE_URL}/study/projects`, {
+    headers: auth(token),
+    data: { title, status: 'WAITING', advisor: advisor || null }
+  }))
+}
+
+export async function getProject(request: APIRequestContext, token: string, id: string): Promise<ApiProject> {
+  return body<ApiProject>(await request.get(`${API_BASE_URL}/study/projects/${id}`, { headers: auth(token) }))
+}
+
+export async function deleteProjectQuietly(request: APIRequestContext, token: string, id: string): Promise<void> {
+  await request.delete(`${API_BASE_URL}/study/projects/${id}`, { headers: auth(token) })
 }
