@@ -113,3 +113,46 @@ test('concluir tarefa única grava e limpa a data de execução no back real', a
     await deleteTaskQuietly(request, token, task.id)
   }
 })
+
+test('conclui tarefa diária criada no fim do dia sem 400 no back real', async ({ page, request }) => {
+  const token = await login(request)
+  const timeZone = 'America/Sao_Paulo'
+  const title = `Tarefa diária E2E ${uniqueSuffix()}`
+  // Início às 23h locais: em UTC já é o dia seguinte, que é exatamente o caso em que a
+  // conclusão de "hoje" era recusada. O back precisa resolver o dia no fuso do cliente.
+  const start = await page.evaluate(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 0, 0).toISOString()
+  })
+  const response = await request.post(`${API_BASE_URL}/tasks`, {
+    headers: { Authorization: `Bearer ${token}`, 'X-Time-Zone': timeZone },
+    data: { title, startDate: start, endDate: null, type: 'DAILY', projectId: null, stageId: null }
+  })
+  expect(response.ok(), await response.text()).toBeTruthy()
+  const task = (await response.json()).data as { id: string }
+
+  try {
+    await signIn(page)
+    await page.getByRole('button', { name: 'Tarefas' }).click()
+    const day = await page.evaluate(() => {
+      const now = new Date()
+      const pad = (part: number) => String(part).padStart(2, '0')
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    })
+    const row = page.locator('.task-line').filter({ hasText: title })
+    await expect(row).toBeVisible()
+
+    await row.locator('.task-row').click()
+    await expect.poll(async () =>
+      (await getTask(request, token, task.id, timeZone)).dailyCompletions?.map(entry => entry.completionDate)
+    ).toContain(day)
+    await expect(page.locator('.sync-error')).toHaveCount(0)
+
+    await row.locator('.task-row').click()
+    await expect.poll(async () =>
+      (await getTask(request, token, task.id, timeZone)).dailyCompletions?.map(entry => entry.completionDate)
+    ).not.toContain(day)
+  } finally {
+    await deleteTaskQuietly(request, token, task.id)
+  }
+})

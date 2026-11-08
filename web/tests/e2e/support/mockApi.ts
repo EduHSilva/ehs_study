@@ -209,6 +209,27 @@ export async function mockApi(page: Page, state: MockState) {
       return fulfill(route, state.projectDetails?.[id ?? ''] ?? null)
     }
 
+    if (path.startsWith('/study/projects/') && method === 'PUT') {
+      const id = path.split('/').pop() ?? ''
+      const body = request.postDataJSON() as { title?: string; advisor?: string | null; status?: string | null }
+      const details = state.projectDetails?.[id] as Record<string, unknown> | undefined
+      const listProject = (state.projects as Array<Record<string, unknown>> | undefined)?.find(item => item.id === id)
+      const target = details ?? listProject
+      if (!target) return fulfill(route, null, 404)
+      if (body.title !== undefined) target.title = body.title
+      if (body.advisor !== undefined) target.advisor = body.advisor ?? ''
+      if (body.status) target.status = body.status
+      if (listProject && listProject !== target) Object.assign(listProject, target)
+      return fulfill(route, target)
+    }
+
+    if (path.startsWith('/study/projects/') && method === 'DELETE') {
+      const id = path.split('/').pop() ?? ''
+      state.projects = (state.projects ?? []).filter(item => (item as { id?: string }).id !== id)
+      if (state.projectDetails) delete state.projectDetails[id]
+      return fulfill(route, null)
+    }
+
     const stageMatch = path.match(/^\/study\/project\/stage\/([^/]+)$/)
     if (stageMatch && method === 'PUT') {
       const stageId = stageMatch[1]

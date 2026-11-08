@@ -1,10 +1,19 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
-import { createProject as createProjectRequest, createStage as createStageRequest, createVersion as createVersionRequest, getProjectDetails, getProjects, updateStage, updateVersion as updateVersionRequest } from './projects.api'
+import { createProject as createProjectRequest, createStage as createStageRequest, createVersion as createVersionRequest, deleteProject as deleteProjectRequest, getProjectDetails, getProjects, updateProject as updateProjectRequest, updateStage, updateVersion as updateVersionRequest } from './projects.api'
 import { getTasksForProject } from '../tasks/tasks.api'
 import { isTaskDone } from '../tasks/calendar'
 import type { Task } from '../tasks/types'
 import type { Project, ProjectDetails } from './types'
+
+// Concluídos ficam no fim; os em andamento em ordem alfabética.
+const sortProjects = (list: Project[]): Project[] =>
+  [...list].sort((a, b) => {
+    const aDone = a.status === 'Concluído'
+    const bDone = b.status === 'Concluído'
+    if (aDone !== bDone) return aDone ? 1 : -1
+    return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+  })
 
 export function useProjects() {
   const { t } = useI18n()
@@ -53,7 +62,7 @@ export function useProjects() {
     try {
       loading.value = true
       error.value = null
-      projects.value = await getProjects()
+      projects.value = sortProjects(await getProjects())
       if (projects.value[0]) await selectProject(projects.value[0].id)
     } catch {
       error.value = t('projectsLoadFailed')
@@ -93,13 +102,79 @@ export function useProjects() {
     error.value = null
     try {
       const created = await createProjectRequest(title.trim(), advisor.trim())
-      projects.value.unshift(created.project)
+      projects.value = sortProjects([created.project, ...projects.value])
       details.value = created
       selectedId.value = created.project.id
       projectTasks.value = []
       return true
     } catch {
       error.value = t('projectCreateFailed')
+      return false
+    } finally {
+      savingProject.value = false
+    }
+  }
+
+  const applyProjectUpdate = (updated: ProjectDetails) => {
+    details.value = updated
+    projects.value = sortProjects(projects.value.map(project => (project.id === updated.project.id ? updated.project : project)))
+  }
+
+  const saveProject = async (title: string, advisor: string): Promise<boolean> => {
+    if (!selectedId.value) return false
+    if (!title.trim()) {
+      error.value = t('projectTitleRequired')
+      return false
+    }
+    savingProject.value = true
+    error.value = null
+    try {
+      applyProjectUpdate(await updateProjectRequest(selectedId.value, { title: title.trim(), advisor: advisor.trim() }))
+      return true
+    } catch {
+      error.value = t('projectEditFailed')
+      return false
+    } finally {
+      savingProject.value = false
+    }
+  }
+
+  const toggleProjectStatus = async (): Promise<boolean> => {
+    if (!details.value || !selectedId.value) return false
+    const done = details.value.project.status === 'Concluído'
+    savingProject.value = true
+    error.value = null
+    try {
+      applyProjectUpdate(await updateProjectRequest(selectedId.value, {
+        title: details.value.project.title,
+        advisor: details.value.project.advisor,
+        status: done ? 'WAITING' : 'DONE'
+      }))
+      return true
+    } catch {
+      error.value = t('projectUpdateFailed')
+      return false
+    } finally {
+      savingProject.value = false
+    }
+  }
+
+  const removeProject = async (): Promise<boolean> => {
+    if (!selectedId.value) return false
+    const id = selectedId.value
+    savingProject.value = true
+    error.value = null
+    try {
+      await deleteProjectRequest(id)
+      projects.value = projects.value.filter(project => project.id !== id)
+      details.value = null
+      selectedId.value = null
+      projectTasks.value = []
+      const next = projects.value[0]
+      if (next) await selectProject(next.id)
+      return true
+    } catch {
+      error.value = t('projectDeleteFailed')
       return false
     } finally {
       savingProject.value = false
@@ -192,6 +267,9 @@ export function useProjects() {
     selectProject,
     loadTasks,
     createProject,
+    saveProject,
+    toggleProjectStatus,
+    removeProject,
     createStage,
     createVersion,
     toggleStage,

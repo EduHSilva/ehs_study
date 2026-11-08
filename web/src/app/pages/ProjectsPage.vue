@@ -8,7 +8,7 @@ import type { ProjectStatus } from '../features/projects/types'
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t, locale } = useI18n()
 const { student } = useStudentProfile()
-const { projects, details, selectedId, loading, savingStageId, savingVersionId, savingNewStage, savingNewVersion, savingProject, error, tasksLoading, tasksError, projectTasks, stageTasks, unassignedTasks, isTaskDone, load, selectProject, createProject, createStage, createVersion, toggleStage, updateVersion } = useProjects()
+const { projects, details, selectedId, loading, savingStageId, savingVersionId, savingNewStage, savingNewVersion, savingProject, error, tasksLoading, tasksError, projectTasks, stageTasks, unassignedTasks, isTaskDone, load, selectProject, createProject, saveProject, toggleProjectStatus, removeProject, createStage, createVersion, toggleStage, updateVersion } = useProjects()
 onMounted(load)
 
 const creatingProject = ref(false)
@@ -23,6 +23,25 @@ const submitProject = async () => {
     projectTitle.value = ''
     projectAdvisor.value = ''
   }
+}
+const editingProject = ref(false)
+const editProjectTitle = ref('')
+const editProjectAdvisor = ref('')
+const confirmingDelete = ref(false)
+const beginProjectEdit = () => {
+  if (!details.value) return
+  editProjectTitle.value = details.value.project.title
+  editProjectAdvisor.value = details.value.project.advisor
+  editingProject.value = true
+}
+const submitProjectEdit = async () => {
+  if (await saveProject(editProjectTitle.value, editProjectAdvisor.value)) editingProject.value = false
+}
+const submitProjectStatus = async () => {
+  await toggleProjectStatus()
+}
+const submitProjectDelete = async () => {
+  if (await removeProject()) confirmingDelete.value = false
 }
 const submitStage = async () => {
   if (await createStage(newStageTitle.value)) newStageTitle.value = ''
@@ -73,6 +92,8 @@ const toggleAllStages = () => {
 watch(selectedId, () => {
   expandedStages.value = {}
   unassignedExpanded.value = false
+  editingProject.value = false
+  confirmingDelete.value = false
 })
 
 // `dueDate` chega em ISO 8601; formatamos pro padrão exibível do card (ex.: "12 nov. 2026 · 12:00").
@@ -128,10 +149,25 @@ const saveVersion = async (id: string) => {
           <div class="project-create-actions"><button class="link" type="button" @click="creatingProject=false">{{ t('cancelAction') }}</button><button class="button" type="submit" :disabled="savingProject">{{ savingProject ? t('saving') : t('createProject') }}</button></div>
         </form>
         <p v-if="!projects.length && !error" class="empty-note">{{ t('noProjects') }}</p>
-        <button v-for="project in projects" :key="project.id" class="project" :class="{selected:project.id===selectedId}" @click="selectProject(project.id)"><strong>{{project.title}}</strong><span><i :style="{width:`${project.progress}%`}"/></span><small>{{ t('percentCompleted', { progress: project.progress }) }}</small></button>
+        <button v-for="project in projects" :key="project.id" class="project" :class="{selected:project.id===selectedId}" @click="selectProject(project.id)"><div class="project-heading"><strong>{{project.title}}</strong><em v-if="project.status === 'Concluído'" class="project-done-tag">{{ t('projectStatusDone') }}</em></div><span><i :style="{width:`${project.progress}%`}"/></span><small>{{ t('percentCompleted', { progress: project.progress }) }}</small></button>
       </article>
       <article v-if="details" class="card project-details">
         <div class="card-title"><div><h2>{{details.project.title}}</h2><p>{{ t('advisorLabel') }} {{details.project.advisor || t('noAdvisor')}}</p></div><span class="priority" :class="statusClass(details.project.status)">{{ statusLabel(details.project.status) }}</span></div>
+        <div class="project-actions">
+          <button class="chip" type="button" @click="beginProjectEdit">✎ {{ t('editProjectAction') }}</button>
+          <button class="chip" type="button" :disabled="savingProject" @click="submitProjectStatus">{{ details.project.status === 'Concluído' ? t('reopenProjectAction') : t('archiveProjectAction') }}</button>
+          <template v-if="confirmingDelete">
+            <span class="delete-confirm">{{ t('deleteProjectConfirm') }}</span>
+            <button class="chip danger" type="button" :disabled="savingProject" @click="submitProjectDelete">{{ t('deleteAction') }}</button>
+            <button class="chip" type="button" @click="confirmingDelete = false">{{ t('cancelAction') }}</button>
+          </template>
+          <button v-else class="chip" type="button" :aria-label="t('deleteProjectAction')" @click="confirmingDelete = true">{{ t('deleteProjectAction') }}</button>
+        </div>
+        <form v-if="editingProject" class="project-create-form project-edit-form" @submit.prevent="submitProjectEdit">
+          <label>{{ t('projectTitleLabel') }}<input v-model="editProjectTitle" :placeholder="t('projectTitlePlaceholder')" required maxlength="200" /></label>
+          <label>{{ t('projectAdvisorLabel') }}<input v-model="editProjectAdvisor" :placeholder="t('projectAdvisorPlaceholder')" maxlength="200" /></label>
+          <div class="project-create-actions"><button class="link" type="button" @click="editingProject=false">{{ t('cancelAction') }}</button><button class="button" type="submit" :disabled="savingProject">{{ savingProject ? t('saving') : t('save') }}</button></div>
+        </form>
         <div class="stage-heading"><h3>{{ t('stagesTitle') }}</h3><div class="stages-toolbar"><button class="chip" :class="{ active: !showCompleted }" :aria-pressed="!showCompleted" @click="showCompleted = !showCompleted">{{ showCompleted ? t('hideCompleted') : t('showCompleted') }}<small v-if="completedStageCount">{{ completedStageCount }}</small></button><button v-if="details.stages.length" class="chip" @click="toggleAllStages">{{ allStagesExpanded ? t('collapseAllStages') : t('expandAllStages') }}</button></div></div>
         <p v-if="hiddenCompletedCount" class="stage-hidden-hint">{{ t('hiddenCompletedCount', { count: hiddenCompletedCount }) }}</p>
         <p v-if="!details.stages.length" class="empty-note">{{ t('noStages') }}</p>
@@ -189,6 +225,14 @@ const saveVersion = async (id: string) => {
 .project-create-form label{display:grid;gap:6px;color:var(--color-muted);font-size:13px}
 .project-create-form input{width:100%;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text)}
 .project-create-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px}
+.project-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.project-actions .chip:disabled{opacity:.55;cursor:default}
+.chip.danger{border-color:var(--color-danger);color:var(--color-danger)}
+.chip.danger:hover{background:var(--color-danger-soft);color:var(--color-danger)}
+.delete-confirm{color:var(--color-danger);font-size:13px}
+.project-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.project-heading strong{overflow:hidden;text-overflow:ellipsis}
+.project-done-tag{flex:none;padding:2px 8px;border-radius:999px;background:var(--color-primary-soft);color:var(--color-primary);font-style:normal;font-size:11px;font-weight:600}
 .project-item-create{display:flex;gap:8px;margin:10px 0 18px;flex-wrap:wrap}
 .project-item-create input{min-width:0;flex:1;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text)}
 .version-create input[type="datetime-local"]{flex:0 1 220px}

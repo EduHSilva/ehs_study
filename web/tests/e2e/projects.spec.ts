@@ -84,3 +84,63 @@ test('recolhe etapas, filtra concluídos e destaca prazos das versões', async (
   await expect(page.getByText('Atrasada há 2 dia(s)')).toBeVisible()
   await expect(page.getByText('Entrega em 2 dia(s)')).toBeVisible()
 })
+
+test('edita título e responsável do projeto', async ({ page }) => {
+  const project = structuredClone(PROJECT)
+  const state = { folders: [], projects: [project], projectDetails: { 'project-1': project } }
+  await signIn(page)
+  await mockApi(page, state)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+  await page.getByRole('button', { name: /TCC: História do Brasil/ }).click()
+  await page.getByRole('button', { name: 'Editar projeto' }).click()
+  const form = page.locator('.project-edit-form')
+  await form.getByLabel('Título do projeto').fill('TCC revisado')
+  await form.getByLabel('Responsável (opcional)').fill('Prof. Lima')
+  await form.getByRole('button', { name: 'Salvar' }).click()
+
+  await expect(page.getByRole('heading', { name: 'TCC revisado' })).toBeVisible()
+  await expect(page.getByText('Prof. Lima')).toBeVisible()
+  expect(state.projectDetails['project-1']).toMatchObject({ title: 'TCC revisado', advisor: 'Prof. Lima', status: 'IN_PROGRESS' })
+})
+
+test('conclui projeto e ele vai para o fim da lista', async ({ page }) => {
+  const alpha = { id: 'project-a', title: 'Alpha', status: 'IN_PROGRESS', progress: 0, advisor: '', stages: [], versions: [] }
+  const zeta = { id: 'project-z', title: 'Zeta', status: 'IN_PROGRESS', progress: 0, advisor: '', stages: [], versions: [] }
+  const state = { folders: [], projects: [alpha, zeta], projectDetails: { 'project-a': alpha, 'project-z': zeta } }
+  await signIn(page)
+  await mockApi(page, state)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+  const list = page.locator('.project-list button.project')
+  await expect(list.nth(0)).toContainText('Alpha')
+  await expect(list.nth(1)).toContainText('Zeta')
+
+  await list.nth(1).click()
+  await page.getByRole('button', { name: 'Concluir projeto' }).click()
+
+  await expect(list.nth(0)).toContainText('Alpha')
+  await expect(list.nth(1)).toContainText('Zeta')
+  await expect(list.nth(1)).toContainText('Concluído')
+  expect(state.projectDetails['project-z'].status).toBe('DONE')
+})
+
+test('exclui projeto após confirmar', async ({ page }) => {
+  const project = structuredClone(PROJECT)
+  const state = { folders: [], projects: [project], projectDetails: { 'project-1': project } }
+  await signIn(page)
+  await mockApi(page, state)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+  await page.getByRole('button', { name: /TCC: História do Brasil/ }).click()
+  await page.getByRole('button', { name: 'Excluir projeto' }).click()
+  await expect(page.getByText('Excluir este projeto?')).toBeVisible()
+  await page.getByRole('button', { name: 'Excluir', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: /TCC: História do Brasil/ })).toHaveCount(0)
+  await expect(page.getByText('Nenhum projeto ainda.')).toBeVisible()
+  expect(state.projects).toHaveLength(0)
+})

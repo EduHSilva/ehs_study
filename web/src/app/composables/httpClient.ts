@@ -53,6 +53,22 @@ export function unwrap<T>(res: DefaultResponse<T>): T {
   throw new Error(res?.message ?? 'Resposta inesperada da API')
 }
 
+function clientTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null
+  } catch {
+    return null
+  }
+}
+
+// O back resolve os dias de calendário no fuso do cliente (`X-Time-Zone`); sem isso o
+// servidor usa o próprio fuso (UTC) e uma diária criada à noite no Brasil começa no dia
+// seguinte, fazendo a conclusão de "hoje" ser recusada com 400.
+function timeZoneHeader(): Record<string, string> {
+  const zone = clientTimeZone()
+  return zone ? { 'X-Time-Zone': zone } : {}
+}
+
 export async function httpClient<T>(path: string, init?: RequestInit): Promise<T> {
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL
   if (!configuredBaseUrl) throw new Error('VITE_API_BASE_URL não configurada')
@@ -62,6 +78,7 @@ export async function httpClient<T>(path: string, init?: RequestInit): Promise<T
   const token = getAuthToken()
   const headers = {
     'Content-Type': 'application/json',
+    ...timeZoneHeader(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...init?.headers
   }

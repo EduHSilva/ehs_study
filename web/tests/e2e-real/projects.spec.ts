@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { API_BASE_URL, login } from './support/api'
+import { API_BASE_URL, createProject, deleteProjectQuietly, getProject, login, uniqueSuffix } from './support/api'
 import { signIn } from './support/ui'
 
 test('carrega a lista de projetos do back real', async ({ page }) => {
@@ -71,5 +71,62 @@ test('edita versão pela UI e persiste no back real', async ({ page, request }) 
       headers: { Authorization: `Bearer ${token}` },
       data: { idProject: project.id, title: version.title, dueDate: version.dueDate }
     })
+  }
+})
+
+test('cria, edita, conclui e exclui projeto pelo back real', async ({ page, request }) => {
+  const token = await login(request)
+  const suffix = uniqueSuffix()
+  const activeTitle = `aaa E2E ${suffix}`
+  const editedTitle = `aaa E2E ${suffix} editado`
+  const otherTitle = `zzz E2E ${suffix}`
+  const first = await createProject(request, token, activeTitle, 'Orientador Inicial')
+  const second = await createProject(request, token, otherTitle, '')
+  const projectButtons = page.locator('.project-list button.project')
+
+  const order = async (title = editedTitle) => {
+    const texts = await projectButtons.allTextContents()
+    return {
+      first: texts.findIndex(text => text.includes(title)),
+      second: texts.findIndex(text => text.includes(otherTitle))
+    }
+  }
+
+  try {
+    await signIn(page)
+    await page.getByRole('button', { name: 'Projetos' }).click()
+
+    await expect(page.getByRole('button', { name: new RegExp(activeTitle) })).toBeVisible()
+    await expect(page.getByRole('button', { name: new RegExp(otherTitle) })).toBeVisible()
+    const initial = await order(activeTitle)
+    expect(initial.first).toBeGreaterThanOrEqual(0)
+    expect(initial.second).toBeGreaterThan(initial.first)
+
+    await page.getByRole('button', { name: new RegExp(activeTitle) }).click()
+    await page.getByRole('button', { name: 'Editar projeto' }).click()
+    const form = page.locator('.project-edit-form')
+    await form.getByLabel('Título do projeto').fill(editedTitle)
+    await form.getByLabel('Responsável (opcional)').fill('Orientador Editado')
+    await form.getByRole('button', { name: 'Salvar' }).click()
+    await expect.poll(async () => (await getProject(request, token, first.id)).title).toBe(editedTitle)
+    await expect.poll(async () => (await getProject(request, token, first.id)).advisor).toBe('Orientador Editado')
+
+    await page.getByRole('button', { name: 'Concluir projeto' }).click()
+    await expect.poll(async () => (await getProject(request, token, first.id)).status).toBe('DONE')
+    await expect.poll(async () => {
+      const current = await order()
+      return current.first > current.second && current.second >= 0
+    }).toBe(true)
+
+    await page.getByRole('button', { name: 'Excluir projeto' }).click()
+    await page.getByRole('button', { name: 'Excluir', exact: true }).click()
+    await expect(page.getByRole('button', { name: new RegExp(editedTitle) })).toHaveCount(0)
+    await expect.poll(async () => {
+      const response = await request.get(`${API_BASE_URL}/study/projects/${first.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      return response.ok()
+    }).toBe(false)
+  } finally {
+    await deleteProjectQuietly(request, token, first.id)
+    await deleteProjectQuietly(request, token, second.id)
   }
 })
