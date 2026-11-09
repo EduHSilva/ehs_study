@@ -19,7 +19,7 @@ function toSession(payload: FocusSessionPayload): FocusSession {
   return { id: payload.id, title: payload.title, minutes: payload.minutes, completedAt: payload.completedAt ?? null }
 }
 
-// Focus uses a calendar day query (yyyy-MM-dd), interpreted in the server's local timezone.
+// Focus usa um dia de calendário (yyyy-MM-dd), resolvido no fuso do cliente (`X-Time-Zone`).
 export async function getTodaySessions(): Promise<FocusSession[]> {
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`

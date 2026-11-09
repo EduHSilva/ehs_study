@@ -6,6 +6,7 @@ import com.studyflow.app.data.model.DashboardData
 import com.studyflow.app.data.model.FocusSession
 import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.model.TaskStatus
+import com.studyflow.app.data.model.TaskType
 import com.studyflow.app.data.model.TaskUpdate
 import com.studyflow.app.data.repository.DashboardRepository
 import com.studyflow.app.data.repository.FocusRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 data class DashboardUiState(
     val data: DashboardData? = null,
@@ -81,6 +83,15 @@ class DashboardViewModel(
         val task = data.tasks.firstOrNull { it.id == id } ?: return
         val previous = task
         val next = if (task.status == TaskStatus.DONE) TaskStatus.PENDING else TaskStatus.DONE
+        // Mesmo dia local que a tela de tarefas: sem uma DAILY com intervalo o back recusa a data
+        // explícita, então deixa o dia corrente implícito.
+        val completionDate = if (
+            task.type == TaskType.DAILY && (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank())
+        ) {
+            LocalDate.now().toString()
+        } else {
+            null
+        }
         replaceTask(task.copy(status = next))
         _state.update { it.copy(savingTaskId = id, errorKey = null) }
         viewModelScope.launch {
@@ -93,6 +104,7 @@ class DashboardViewModel(
                         startDate = task.startDate,
                         endDate = task.endDate,
                         status = next,
+                        completionDate = completionDate,
                     ),
                 )
                 replaceTask(saved)
