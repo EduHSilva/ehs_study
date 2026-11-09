@@ -52,11 +52,12 @@ class ApiClient(
             val original = chain.request()
             val builder = original.newBuilder()
             sessionManager.token?.let { builder.header("Authorization", "Bearer $it") }
+            // O back resolve os dias de calendário no fuso do cliente; sem isso a diária
+            // criada à noite começa no dia seguinte (UTC) e a conclusão é recusada.
+            // Vale também para /study/dashboard, que consulta o serviço de tarefas.
+            builder.header("X-Time-Zone", TimeZone.getDefault().id)
             if (original.url.encodedPath.startsWith("/tasks")) {
                 sessionManager.userId?.let { builder.header("X-User-ID", it) }
-                // O back resolve os dias de calendário no fuso do cliente; sem isso a diária
-                // criada à noite começa no dia seguinte (UTC) e a conclusão é recusada.
-                builder.header("X-Time-Zone", TimeZone.getDefault().id)
             }
             val response = chain.proceed(builder.build())
             if (response.code == 401) sessionManager.expire()

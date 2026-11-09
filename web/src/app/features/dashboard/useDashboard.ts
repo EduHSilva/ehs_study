@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { getDashboard } from './dashboard.api'
 import { updateTask } from '../tasks/tasks.api'
+import { dayKey } from '../tasks/calendar'
 import { getTodaySessions } from '../pomodoro/pomodoro.api'
 import type { DashboardData } from './types'
 import type { FocusSession } from '../pomodoro/types'
@@ -46,8 +47,12 @@ export function useDashboard() {
     savingTaskId.value = id
     const previous = { ...item }
     item.status = item.status === 'DONE' ? 'PENDING' : 'DONE'
+    // O dia vem do calendário local, como na tela de tarefas: sem isso a conclusão dependeria do
+    // fuso do servidor e, perto da meia-noite, cairia no dia seguinte.
+    const day = dayKey(new Date())
+    const completionDate = item.type === 'DAILY' ? ((item.startDate || item.endDate) ? day : null) : day
     try {
-      Object.assign(item, await updateTask({ ...item }))
+      Object.assign(item, await updateTask({ ...item, completionDate }))
     } catch { Object.assign(item, previous); error.value = t('taskSaveFailed') } finally { savingTaskId.value = null }
   }
 
