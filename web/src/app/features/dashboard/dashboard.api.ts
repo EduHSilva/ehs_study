@@ -14,6 +14,7 @@ interface DashboardPayload {
 function readStatus(item: Record<string, unknown>): Task['status'] {
   if (item.status === 'DONE') return 'DONE'
   if (item.status === 'DELAYED') return 'DELAYED'
+  if (item.status === 'WORKING') return 'WORKING'
   return item.completed === true ? 'DONE' : 'PENDING'
 }
 

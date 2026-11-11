@@ -4,7 +4,7 @@ import { mockApi, signIn } from './support/mockApi'
 const PROJECT = {
   id: 'project-1',
   title: 'TCC: História do Brasil',
-  status: 'IN_PROGRESS',
+  status: 'WORKING',
   progress: 50,
   advisor: 'Prof. Silva',
   stages: [{ id: 'stage-1', name: 'Introdução', done: false }],
@@ -102,12 +102,12 @@ test('edita título e responsável do projeto', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'TCC revisado' })).toBeVisible()
   await expect(page.getByText('Prof. Lima')).toBeVisible()
-  expect(state.projectDetails['project-1']).toMatchObject({ title: 'TCC revisado', advisor: 'Prof. Lima', status: 'IN_PROGRESS' })
+  expect(state.projectDetails['project-1']).toMatchObject({ title: 'TCC revisado', advisor: 'Prof. Lima', status: 'WORKING' })
 })
 
 test('conclui projeto e ele vai para o fim da lista', async ({ page }) => {
-  const alpha = { id: 'project-a', title: 'Alpha', status: 'IN_PROGRESS', progress: 0, advisor: '', stages: [], versions: [] }
-  const zeta = { id: 'project-z', title: 'Zeta', status: 'IN_PROGRESS', progress: 0, advisor: '', stages: [], versions: [] }
+  const alpha = { id: 'project-a', title: 'Alpha', status: 'WORKING', progress: 0, advisor: '', stages: [], versions: [] }
+  const zeta = { id: 'project-z', title: 'Zeta', status: 'WORKING', progress: 0, advisor: '', stages: [], versions: [] }
   const state = { folders: [], projects: [alpha, zeta], projectDetails: { 'project-a': alpha, 'project-z': zeta } }
   await signIn(page)
   await mockApi(page, state)

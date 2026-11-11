@@ -17,6 +17,7 @@ class StudyCalendarTest {
         start: String?,
         end: String?,
         status: TaskStatus = TaskStatus.PENDING,
+        completedDate: String? = null,
     ) = Task(
         id = "unique",
         title = "Revisar capítulo",
@@ -25,6 +26,7 @@ class StudyCalendarTest {
         endDate = end,
         type = TaskType.UNIQUE,
         status = status,
+        completedDate = completedDate,
         dailyStatistics = null,
         dailyCompletions = emptyList(),
     )
@@ -85,6 +87,34 @@ class StudyCalendarTest {
         assertFalse(StudyCalendar.tasksForDay(listOf(pending), "2026-03-10", "2026-03-10").single().done)
         assertTrue(StudyCalendar.tasksForDay(listOf(done), "2026-03-10", "2026-03-10").single().done)
         assertTrue(StudyCalendar.isTaskDone(done, "2026-03-10"))
+    }
+
+    @Test
+    fun `done unique task only occupies its completed date`() {
+        val task = uniqueTask(
+            start = "2026-03-10T09:00:00",
+            end = "2026-03-12T18:00:00",
+            status = TaskStatus.DONE,
+            completedDate = "2026-03-11",
+        )
+        val today = "2026-03-11"
+
+        assertTrue(StudyCalendar.tasksForDay(listOf(task), "2026-03-10", today).isEmpty())
+        assertTrue(StudyCalendar.tasksForDay(listOf(task), "2026-03-11", today).single().done)
+        assertTrue(StudyCalendar.tasksForDay(listOf(task), "2026-03-12", today).isEmpty())
+    }
+
+    @Test
+    fun `legacy done unique task without completed date keeps the whole range`() {
+        val task = uniqueTask(
+            start = "2026-03-10T09:00:00",
+            end = "2026-03-12T18:00:00",
+            status = TaskStatus.DONE,
+        )
+        val today = "2026-03-11"
+
+        assertEquals(1, StudyCalendar.tasksForDay(listOf(task), "2026-03-11", today).size)
+        assertTrue(StudyCalendar.tasksForDay(listOf(task), "2026-03-11", today).single().done)
     }
 
     @Test

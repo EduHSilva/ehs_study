@@ -5,7 +5,7 @@ import type { MockState, MockTask } from './support/mockApi'
 const PROJECT_A = {
   id: 'project-1',
   title: 'Projeto Alfa',
-  status: 'IN_PROGRESS',
+  status: 'WORKING',
   progress: 0,
   advisor: '',
   stages: [{ id: 'stage-1', name: 'Introdução', done: false }],
@@ -15,7 +15,7 @@ const PROJECT_A = {
 const PROJECT_B = {
   id: 'project-2',
   title: 'Projeto Beta',
-  status: 'IN_PROGRESS',
+  status: 'WORKING',
   progress: 0,
   advisor: '',
   stages: [{ id: 'stage-2', name: 'Metodologia', done: false }],

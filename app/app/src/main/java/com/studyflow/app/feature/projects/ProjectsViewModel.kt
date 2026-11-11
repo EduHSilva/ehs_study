@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectDetails
+import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.repository.ProjectsRepository
 import com.studyflow.app.data.repository.TasksRepository
 import com.studyflow.app.domain.ApiDates
+import com.studyflow.app.domain.projects.ProjectSorting
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +42,7 @@ class ProjectsViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, errorKey = null) }
             try {
-                val projects = projectsRepository.getProjects()
+                val projects = ProjectSorting.sort(projectsRepository.getProjects())
                 _state.update { it.copy(projects = projects, loading = false) }
             } catch (e: CancellationException) {
                 throw e
@@ -63,7 +65,7 @@ class ProjectsViewModel(
                 val created = projectsRepository.createProject(trimmed, advisor.trim())
                 _state.update {
                     it.copy(
-                        projects = listOf(created.project) + it.projects,
+                        projects = ProjectSorting.sort(listOf(created.project) + it.projects),
                         savingProject = false,
                         newProjectId = created.project.id,
                     )
@@ -92,6 +94,8 @@ data class ProjectDetailUiState(
     val savingVersionId: String? = null,
     val savingNewStage: Boolean = false,
     val savingNewVersion: Boolean = false,
+    val savingProject: Boolean = false,
+    val projectDeleted: Boolean = false,
     val todayKey: String = LocalDate.now().toString(),
 )
 
@@ -136,6 +140,73 @@ class ProjectDetailViewModel(
                 _state.update { it.copy(tasks = emptyList(), tasksErrorKey = "projectTasksLoadFailed") }
             } finally {
                 _state.update { it.copy(tasksLoading = false) }
+            }
+        }
+    }
+
+    fun saveProject(title: String, advisor: String) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) {
+            _state.update { it.copy(errorKey = "projectTitleRequired") }
+            return
+        }
+        if (_state.value.savingProject) return
+        _state.update { it.copy(savingProject = true, errorKey = null) }
+        viewModelScope.launch {
+            try {
+                val updated = projectsRepository.updateProject(projectId, trimmed, advisor.trim())
+                _state.update { it.copy(details = updated) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(errorKey = "projectEditFailed") }
+            } finally {
+                _state.update { it.copy(savingProject = false) }
+            }
+        }
+    }
+
+    fun toggleProjectStatus() {
+        val details = _state.value.details ?: return
+        if (_state.value.savingProject) return
+        val next = if (details.project.status == ProjectStatus.DONE) {
+            ProjectStatus.WAITING
+        } else {
+            ProjectStatus.DONE
+        }
+        _state.update { it.copy(savingProject = true, errorKey = null) }
+        viewModelScope.launch {
+            try {
+                val updated = projectsRepository.updateProject(
+                    id = projectId,
+                    title = details.project.title,
+                    advisor = details.project.advisor,
+                    status = next,
+                )
+                _state.update { it.copy(details = updated) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(errorKey = "projectUpdateFailed") }
+            } finally {
+                _state.update { it.copy(savingProject = false) }
+            }
+        }
+    }
+
+    fun removeProject() {
+        if (_state.value.savingProject) return
+        _state.update { it.copy(savingProject = true, errorKey = null) }
+        viewModelScope.launch {
+            try {
+                projectsRepository.deleteProject(projectId)
+                _state.update { it.copy(details = null, projectDeleted = true) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(errorKey = "projectDeleteFailed") }
+            } finally {
+                _state.update { it.copy(savingProject = false) }
             }
         }
     }

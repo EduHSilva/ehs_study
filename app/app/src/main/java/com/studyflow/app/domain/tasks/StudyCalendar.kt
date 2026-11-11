@@ -83,7 +83,8 @@ object StudyCalendar {
         ApiDates.localDateOrNull(task.endDate) ?: taskStart(task)
 
     /**
-     * - `UNIQUE` ocupa todos os dias entre início e fim; concluída = `status == DONE`.
+     * - `UNIQUE` pendente ocupa todos os dias entre início e fim; concluída, ocupa só o dia de
+     *   `completedDate` (tarefas antigas sem a data continuam ocupando o intervalo todo).
      * - `DAILY` vale a partir do início e é concluída quando o dia está em `dailyCompletions`.
      */
     fun tasksForDay(tasks: List<Task>, key: String, today: String): List<DayTask> {
@@ -100,6 +101,10 @@ object StudyCalendar {
             val from = taskStart(task) ?: continue
             val to = taskEnd(task) ?: continue
             if (day.isBefore(from) || day.isAfter(to)) continue
+            if (task.status == TaskStatus.DONE) {
+                val completedOn = ApiDates.dayKeyFrom(task.completedDate)
+                if (completedOn != null && completedOn != key) continue
+            }
             result += DayTask(task, task.status == TaskStatus.DONE)
         }
         return result

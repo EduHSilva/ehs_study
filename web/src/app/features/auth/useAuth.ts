@@ -5,7 +5,7 @@ import {
   notifyUnauthorized,
   UNAUTHORIZED_EVENT
 } from '../../composables/httpClient'
-import { currentPage } from '../../composables/useNavigation'
+import { navigate } from '../../composables/useNavigation'
 import { login as loginRequest, loginWithGoogle as googleLoginRequest, me as meRequest, register as registerRequest, updateUserName } from './auth.api'
 import type { AuthSession, Credentials, RegisterInput } from './types'
 
@@ -45,13 +45,13 @@ const registerSuccess = ref(false)
 function doLogout() {
   notifyUnauthorized()
   session.value = null
-  currentPage.value = 'dashboard'
+  navigate('dashboard')
 }
 
 if (typeof window !== 'undefined') {
   window.addEventListener(UNAUTHORIZED_EVENT, () => {
     session.value = null
-    currentPage.value = 'dashboard'
+    navigate('dashboard')
   })
 }
 
@@ -67,7 +67,7 @@ async function login(email: string, password: string): Promise<boolean> {
   try {
     session.value = await loginRequest(credentials)
     persistSession(session.value)
-    currentPage.value = 'dashboard'
+    navigate('dashboard')
     return true
   } catch {
     error.value = useI18n().t('loginFailed')
@@ -83,7 +83,7 @@ async function loginWithGoogle(idToken: string): Promise<boolean> {
   try {
     session.value = await googleLoginRequest(idToken)
     persistSession(session.value)
-    currentPage.value = 'dashboard'
+    navigate('dashboard')
     return true
   } catch {
     error.value = useI18n().t('googleLoginFailed')

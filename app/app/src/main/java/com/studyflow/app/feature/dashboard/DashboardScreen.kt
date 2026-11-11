@@ -42,6 +42,7 @@ import com.studyflow.app.data.model.TaskStatus
 import com.studyflow.app.data.model.TaskType
 import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.TaskFormat
+import com.studyflow.app.feature.pomodoro.TimerMode
 import com.studyflow.app.navigation.Routes
 import com.studyflow.app.ui.LocalContainer
 import com.studyflow.app.ui.appViewModel
@@ -53,6 +54,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit) {
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val session by LocalContainer.current.sessionManager.session.collectAsStateWithLifecycle()
+    val timerState by LocalContainer.current.pomodoroTimer.state.collectAsStateWithLifecycle()
     val s = LocalStrings.current
 
     val firstName = session?.user?.name?.trim()?.split(Regex("\\s+"))?.firstOrNull()
@@ -150,33 +152,75 @@ fun DashboardScreen(onNavigate: (String) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(s["focusTitle"], style = MaterialTheme.typography.titleMedium)
-                    Tag(
-                        text = s["focusTag"],
-                        color = MaterialTheme.colorScheme.primary,
-                        background = StudyFlowTheme.colors.primarySoft,
-                    )
+                    if (timerState.isActive) {
+                        Tag(
+                            text = s["timerActiveTag"],
+                            color = MaterialTheme.colorScheme.primary,
+                            background = StudyFlowTheme.colors.primarySoft,
+                        )
+                    } else {
+                        Tag(
+                            text = s["focusTag"],
+                            color = MaterialTheme.colorScheme.primary,
+                            background = StudyFlowTheme.colors.primarySoft,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = ApiDates.formatTime(state.focus?.completedAt, s.locale) ?: "—",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Column {
-                        state.focus?.let {
-                            Text(it.title, style = MaterialTheme.typography.titleSmall)
+                if (timerState.isActive) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            text = timerState.timeLeft,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                s.format("focusMinutes", "minutes" to it.minutes),
+                                s[if (timerState.mode == TimerMode.FOCUS) "focusModeShort" else "breakModeShort"],
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                when {
+                                    timerState.completed ->
+                                        s[if (timerState.mode == TimerMode.FOCUS) "focusComplete" else "breakComplete"]
+                                    timerState.running -> s["timerRunning"]
+                                    else -> s["timerPaused"]
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = StudyFlowTheme.colors.subtle,
                             )
                         }
                     }
-                }
-                if (state.focus == null) {
-                    Spacer(Modifier.height(10.dp))
-                    EmptyNote(s["noFocusToday"])
+                    if (timerState.started && timerState.mode == TimerMode.FOCUS) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            s["registerFocusHint"],
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StudyFlowTheme.colors.success,
+                        )
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            text = ApiDates.formatTime(state.focus?.completedAt, s.locale) ?: "—",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Column {
+                            state.focus?.let {
+                                Text(it.title, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    s.format("focusMinutes", "minutes" to it.minutes),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = StudyFlowTheme.colors.subtle,
+                                )
+                            }
+                        }
+                    }
+                    if (state.focus == null) {
+                        Spacer(Modifier.height(10.dp))
+                        EmptyNote(s["noFocusToday"])
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 LinkButton(text = s["goToTimer"], onClick = { onNavigate(Routes.POMODORO) })

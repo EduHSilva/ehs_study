@@ -53,8 +53,10 @@ const submitVersion = async () => {
   }
 }
 
-const statusClass = (status: ProjectStatus) => (status === 'Concluído' ? 'baixa' : 'média')
-const statusLabel = (status: ProjectStatus) => t(status === 'Concluído' ? 'projectStatusDone' : 'projectStatusInProgress')
+const statusClass = (status: ProjectStatus) =>
+  status === 'Concluído' ? 'baixa' : status === 'Em andamento' ? 'média' : 'pendente'
+const statusLabel = (status: ProjectStatus) =>
+  t(status === 'Concluído' ? 'projectStatusDone' : status === 'Em andamento' ? 'projectStatusInProgress' : 'projectStatusPending')
 
 const showCompleted = ref(true)
 const expandedStages = ref<Record<string, boolean>>({})

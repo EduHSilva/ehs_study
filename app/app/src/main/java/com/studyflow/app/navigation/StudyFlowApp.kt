@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,11 +23,11 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.ViewKanban
 import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -71,8 +73,10 @@ import com.studyflow.app.feature.auth.AuthScreen
 import com.studyflow.app.feature.auth.BrandMark
 import com.studyflow.app.feature.auth.SessionViewModel
 import com.studyflow.app.feature.dashboard.DashboardScreen
+import com.studyflow.app.feature.kanban.KanbanScreen
 import com.studyflow.app.feature.notes.NotesScreen
 import com.studyflow.app.feature.pomodoro.PomodoroScreen
+import com.studyflow.app.feature.pomodoro.PomodoroWidget
 import com.studyflow.app.feature.profile.ProfileScreen
 import com.studyflow.app.feature.projects.ProjectDetailScreen
 import com.studyflow.app.feature.projects.ProjectsScreen
@@ -92,6 +96,7 @@ private val drawerDestinations = listOf(
     Destination(Routes.POMODORO, Icons.Filled.Timer, "pomodoro"),
     Destination(Routes.NOTES, Icons.Filled.Description, "notes"),
     Destination(Routes.TASKS, Icons.Filled.Checklist, "tasks"),
+    Destination(Routes.KANBAN, Icons.Filled.ViewKanban, "kanban"),
     Destination(Routes.PROJECTS, Icons.Filled.School, "projects"),
     Destination(Routes.REVIEW, Icons.Filled.FindInPage, "review"),
     Destination(Routes.PROFILE, Icons.Filled.Person, "profile"),
@@ -137,6 +142,7 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
         Routes.POMODORO -> s["timerTitle"]
         Routes.NOTES -> s["notesTitle"]
         Routes.TASKS -> s["tasks"]
+        Routes.KANBAN -> s["kanban"]
         Routes.PROJECTS, Routes.PROJECT_DETAIL -> s["projectsTitle"]
         Routes.PROFILE -> s["profileTitle"]
         Routes.REVIEW -> s["reviewTitle"]
@@ -210,29 +216,46 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
                 }
             },
         ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = Routes.DASHBOARD,
-                modifier = Modifier.padding(innerPadding),
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             ) {
-                composable(Routes.DASHBOARD) { DashboardScreen(onNavigate = go) }
-                composable(Routes.POMODORO) { PomodoroScreen() }
-                composable(Routes.NOTES) { NotesScreen() }
-                composable(Routes.TASKS) { TasksScreen() }
-                composable(Routes.PROJECTS) {
-                    ProjectsScreen(onOpenProject = { id -> navController.navigate(Routes.projectDetail(id)) })
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.DASHBOARD,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    composable(Routes.DASHBOARD) { DashboardScreen(onNavigate = go) }
+                    composable(Routes.POMODORO) { PomodoroScreen() }
+                    composable(Routes.NOTES) { NotesScreen() }
+                    composable(Routes.TASKS) { TasksScreen() }
+                    composable(Routes.KANBAN) { KanbanScreen() }
+                    composable(Routes.PROJECTS) {
+                        ProjectsScreen(onOpenProject = { id -> navController.navigate(Routes.projectDetail(id)) })
+                    }
+                    composable(
+                        route = Routes.PROJECT_DETAIL,
+                        arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
+                    ) { entry ->
+                        ProjectDetailScreen(
+                            projectId = entry.arguments?.getString("projectId").orEmpty(),
+                            onBack = { navController.popBackStack() },
+                            onManageTasks = { go(Routes.TASKS) },
+                        )
+                    }
+                    composable(Routes.PROFILE) { ProfileScreen() }
+                    composable(Routes.REVIEW) { ReviewScreen() }
                 }
-                composable(
-                    route = Routes.PROJECT_DETAIL,
-                    arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
-                ) { entry ->
-                    ProjectDetailScreen(
-                        projectId = entry.arguments?.getString("projectId").orEmpty(),
-                        onBack = { navController.popBackStack() },
+                if (route != Routes.POMODORO) {
+                    PomodoroWidget(
+                        onOpen = { go(Routes.POMODORO) },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 16.dp, end = 76.dp, bottom = 16.dp)
+                            .widthIn(max = 320.dp),
                     )
                 }
-                composable(Routes.PROFILE) { ProfileScreen() }
-                composable(Routes.REVIEW) { ReviewScreen() }
             }
         }
     }

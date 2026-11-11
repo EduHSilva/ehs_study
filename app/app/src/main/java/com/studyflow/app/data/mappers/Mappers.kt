@@ -76,6 +76,7 @@ object Mappers {
             endDate = endDate,
             type = toType(dto.type),
             status = status,
+            completedDate = dto.completedDate,
             projectId = dto.projectId,
             stageId = dto.stageId,
             dailyStatistics = toStats(dto.dailyStatistics),
@@ -114,7 +115,11 @@ object Mappers {
         id = dto.id,
         title = dto.title,
         progress = dto.progress ?: 0,
-        status = if (dto.status == "DONE") ProjectStatus.DONE else ProjectStatus.IN_PROGRESS,
+        status = when (dto.status) {
+            "DONE" -> ProjectStatus.DONE
+            "WORKING" -> ProjectStatus.WORKING
+            else -> ProjectStatus.WAITING
+        },
         advisor = dto.advisor.orEmpty(),
     )
 

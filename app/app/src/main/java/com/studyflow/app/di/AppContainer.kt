@@ -20,6 +20,7 @@ import com.studyflow.app.data.repository.NotesRepository
 import com.studyflow.app.data.repository.ProjectsRepository
 import com.studyflow.app.data.repository.ReviewRepository
 import com.studyflow.app.data.repository.TasksRepository
+import com.studyflow.app.feature.pomodoro.PomodoroTimer
 import kotlinx.serialization.json.Json
 
 /** Injeção manual (sem framework): a aplicação cria e expõe as dependências. */
@@ -27,6 +28,7 @@ class AppContainer(context: Context) {
     private val prefs = AppPreferences(context)
 
     val settings = AppSettings(prefs)
+    val pomodoroTimer = PomodoroTimer(prefs)
     val sessionManager = SessionManager(
         prefs = prefs,
         json = Json { ignoreUnknownKeys = true },

@@ -101,6 +101,12 @@ interface ProjectsApi {
     @POST("study/projects")
     suspend fun create(@Body body: CreateProjectRequest): Envelope<ProjectDto>
 
+    @PUT("study/projects/{id}")
+    suspend fun update(@Path("id") id: String, @Body body: UpdateProjectRequest): Envelope<ProjectDto>
+
+    @DELETE("study/projects/{id}")
+    suspend fun delete(@Path("id") id: String): EmptyEnvelope
+
     @POST("study/project/stage")
     suspend fun createStage(@Body body: StageRequest): Envelope<StageDto>
 

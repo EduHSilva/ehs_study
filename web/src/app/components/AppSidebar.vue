@@ -8,7 +8,7 @@ const { t } = useI18n()
 const { pending, logout } = useAuth()
 const asset = (name: string) => `${import.meta.env.BASE_URL}assets/${name}`
 const navItems: { key: AppPage; icon: string; disabled?: boolean }[] = [
-    { key:'dashboard', icon:asset('house.svg') }, { key:'pomodoro', icon:asset('clock.svg') }, { key:'notes', icon:asset('file-text.svg') }, { key:'tasks', icon:asset('list-check.svg') }, { key:'projects', icon:asset('layers.svg') }, { key:'review', icon:asset('file-search.svg'), disabled:true }, { key:'profile', icon:asset('user.svg') }
+    { key:'dashboard', icon:asset('house.svg') }, { key:'pomodoro', icon:asset('clock.svg') }, { key:'notes', icon:asset('file-text.svg') }, { key:'tasks', icon:asset('list-check.svg') }, { key:'kanban', icon:asset('kanban.svg') }, { key:'projects', icon:asset('layers.svg') }, { key:'review', icon:asset('file-search.svg'), disabled:true }, { key:'profile', icon:asset('user.svg') }
 ]
 </script>
 

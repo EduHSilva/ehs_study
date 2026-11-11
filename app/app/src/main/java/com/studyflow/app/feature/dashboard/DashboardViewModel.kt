@@ -84,15 +84,23 @@ class DashboardViewModel(
         val previous = task
         val next = if (task.status == TaskStatus.DONE) TaskStatus.PENDING else TaskStatus.DONE
         // Mesmo dia local que a tela de tarefas: sem uma DAILY com intervalo o back recusa a data
-        // explícita, então deixa o dia corrente implícito.
-        val completionDate = if (
-            task.type == TaskType.DAILY && (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank())
-        ) {
-            LocalDate.now().toString()
+        // explícita; numa UNIQUE o dia vai como `completionDate`.
+        val today = LocalDate.now().toString()
+        val completionDate = if (task.type == TaskType.DAILY) {
+            if (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank()) today else null
         } else {
-            null
+            today
         }
-        replaceTask(task.copy(status = next))
+        replaceTask(
+            task.copy(
+                status = next,
+                completedDate = if (task.type == TaskType.DAILY) {
+                    task.completedDate
+                } else {
+                    if (next == TaskStatus.DONE) today else null
+                },
+            ),
+        )
         _state.update { it.copy(savingTaskId = id, errorKey = null) }
         viewModelScope.launch {
             try {

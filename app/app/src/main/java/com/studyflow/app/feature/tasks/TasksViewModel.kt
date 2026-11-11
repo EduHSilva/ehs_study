@@ -44,6 +44,8 @@ data class TasksUiState(
     val todayKey: String = LocalDate.now().toString(),
     val formOpen: Boolean = false,
     val creating: Boolean = false,
+    val updating: Boolean = false,
+    val editingId: String? = null,
     val formErrorKey: String? = null,
     val projects: List<Project> = emptyList(),
     val stagesByProject: Map<String, List<ProjectStage>> = emptyMap(),
@@ -55,6 +57,10 @@ data class TasksUiState(
     val canGoNext: Boolean get() = page < lastPage
     val targetDay: String get() = selectedDay ?: todayKey
     val formStages: List<ProjectStage> get() = formProjectId?.let { stagesByProject[it] }.orEmpty()
+    val editingTask: Task?
+        get() = editingId?.let { id ->
+            items.firstOrNull { it.id == id } ?: periodTasks.firstOrNull { it.id == id }
+        }
 }
 
 class TasksViewModel(
@@ -266,7 +272,60 @@ class TasksViewModel(
             (task.type != TaskType.DAILY && task.status == TaskStatus.DONE)
 
     fun toggleForm() {
-        _state.update { it.copy(formOpen = !it.formOpen, formErrorKey = null) }
+        _state.update {
+            it.copy(
+                formOpen = !it.formOpen,
+                formErrorKey = null,
+                editingId = null,
+                formProjectId = null,
+                formStageId = null,
+            )
+        }
+    }
+
+    fun openEdit(task: Task) {
+        _state.update {
+            it.copy(
+                formOpen = true,
+                editingId = task.id,
+                formErrorKey = null,
+                formProjectId = task.projectId,
+                formStageId = task.stageId,
+            )
+        }
+        val projectId = task.projectId ?: return
+        if (_state.value.stagesByProject.containsKey(projectId)) return
+        viewModelScope.launch {
+            val stages = runCatching {
+                projectsRepository.getProjectDetails(projectId).stages
+            }.getOrDefault(emptyList())
+            _state.update { it.copy(stagesByProject = it.stagesByProject + (projectId to stages)) }
+        }
+    }
+
+    fun submitForm(
+        title: String,
+        start: LocalDateTime?,
+        end: LocalDateTime?,
+        type: TaskType,
+    ) {
+        if (_state.value.editingId != null) {
+            saveEdit(title, start, end, type)
+        } else {
+            create(title, start, end, type)
+        }
+    }
+
+    private fun closeForm() {
+        _state.update {
+            it.copy(
+                formOpen = false,
+                formErrorKey = null,
+                editingId = null,
+                formProjectId = null,
+                formStageId = null,
+            )
+        }
     }
 
     fun create(
@@ -341,6 +400,67 @@ class TasksViewModel(
         }
     }
 
+    // Na edição o início/fim vazios não vão no corpo (o back mantém o valor atual), mas o
+    // vínculo com projeto/etapa é sempre enviado — null explícito desvincula, como no web.
+    private fun saveEdit(
+        title: String,
+        start: LocalDateTime?,
+        end: LocalDateTime?,
+        type: TaskType,
+    ) {
+        val current = _state.value
+        if (current.updating) return
+        val task = current.editingTask
+        if (task == null) {
+            closeForm()
+            return
+        }
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) {
+            _state.update { it.copy(formErrorKey = "taskTitleRequired") }
+            return
+        }
+        if (type == TaskType.UNIQUE && start != null && end != null && start.isAfter(end)) {
+            _state.update { it.copy(formErrorKey = "taskRangeInverted") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(updating = true, formErrorKey = null) }
+            try {
+                val saved = tasksRepository.update(
+                    task.id,
+                    TaskUpdate(
+                        title = trimmed,
+                        type = type,
+                        startDate = start?.let(ApiDates::toIso),
+                        endDate = end?.let(ApiDates::toIso),
+                        projectId = current.formProjectId,
+                        stageId = current.formProjectId?.let { current.formStageId },
+                        clearProjectLink = current.formProjectId == null,
+                    ),
+                )
+                // O PUT não devolve o histórico completo da DAILY; preserva o que a lista já tinha.
+                val merged = saved.copy(dailyCompletions = task.dailyCompletions)
+                closeForm()
+                replaceTask(merged)
+                try {
+                    fetchPeriod()
+                    applyFilter()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    _state.update { it.copy(errorKey = "tasksLoadFailed") }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(formErrorKey = "taskEditFailed") }
+            } finally {
+                _state.update { it.copy(updating = false) }
+            }
+        }
+    }
+
     fun toggle(id: String) {
         val current = _state.value
         if (current.savingId == id) return
@@ -363,16 +483,21 @@ class TasksViewModel(
         val wasDone = isDone(task, current)
         val next = if (wasDone) TaskStatus.PENDING else TaskStatus.DONE
         val previous = task
-        val completionDate = if (
-            task.type == TaskType.DAILY && (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank())
-        ) {
-            day
+        // Numa DAILY o que muda é a lista de dias concluídos; sem intervalo o back recusa uma data
+        // explícita. Numa UNIQUE o dia vai como `completionDate`, que vira o `completedDate`.
+        val completionDate = if (task.type == TaskType.DAILY) {
+            if (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank()) day else null
         } else {
-            null
+            day
         }
 
         val optimistic = task.copy(
             status = next,
+            completedDate = if (task.type == TaskType.DAILY) {
+                task.completedDate
+            } else {
+                if (next == TaskStatus.DONE) day else null
+            },
             dailyStatistics = task.dailyStatistics?.copy(
                 completedToday = next == TaskStatus.DONE && day == today,
             ),
@@ -417,10 +542,22 @@ class TasksViewModel(
             try {
                 tasksRepository.delete(id)
                 _state.update { current ->
-                    current.copy(
-                        periodTasks = current.periodTasks.filterNot { it.id == id },
-                        items = current.items.filterNot { it.id == id },
-                    )
+                    if (current.editingId == id) {
+                        current.copy(
+                            formOpen = false,
+                            editingId = null,
+                            formErrorKey = null,
+                            formProjectId = null,
+                            formStageId = null,
+                            periodTasks = current.periodTasks.filterNot { it.id == id },
+                            items = current.items.filterNot { it.id == id },
+                        )
+                    } else {
+                        current.copy(
+                            periodTasks = current.periodTasks.filterNot { it.id == id },
+                            items = current.items.filterNot { it.id == id },
+                        )
+                    }
                 }
                 applyFilter()
             } catch (e: CancellationException) {

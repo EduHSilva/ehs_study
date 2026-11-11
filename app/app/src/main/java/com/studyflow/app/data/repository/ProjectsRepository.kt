@@ -4,12 +4,14 @@ import com.studyflow.app.core.network.unwrap
 import com.studyflow.app.data.mappers.Mappers
 import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectDetails
+import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.data.model.ProjectVersion
 import com.studyflow.app.data.model.ProjectStage
 import com.studyflow.app.data.remote.CreateProjectRequest
 import com.studyflow.app.data.remote.VersionRequest
 import com.studyflow.app.data.remote.ProjectsApi
 import com.studyflow.app.data.remote.StageRequest
+import com.studyflow.app.data.remote.UpdateProjectRequest
 
 class ProjectsRepository(private val api: ProjectsApi) {
     suspend fun getProjects(): List<Project> =
@@ -27,6 +29,33 @@ class ProjectsRepository(private val api: ProjectsApi) {
 
     suspend fun createStage(projectId: String, title: String): ProjectStage =
         Mappers.stage(api.createStage(StageRequest(projectId, title, false)).unwrap())
+
+    suspend fun updateProject(
+        id: String,
+        title: String,
+        advisor: String,
+        status: ProjectStatus? = null,
+    ): ProjectDetails =
+        Mappers.projectDetails(
+            api.update(
+                id,
+                UpdateProjectRequest(
+                    title = title,
+                    advisor = advisor.ifBlank { null },
+                    status = status?.let {
+                        when (it) {
+                            ProjectStatus.DONE -> "DONE"
+                            ProjectStatus.WORKING -> "WORKING"
+                            ProjectStatus.WAITING -> "WAITING"
+                        }
+                    },
+                ),
+            ).unwrap(),
+        )
+
+    suspend fun deleteProject(id: String) {
+        api.delete(id)
+    }
 
     suspend fun updateStage(projectId: String, stageId: String, title: String, done: Boolean): ProjectStage =
         Mappers.stage(api.updateStage(stageId, StageRequest(projectId, title, done)).unwrap())

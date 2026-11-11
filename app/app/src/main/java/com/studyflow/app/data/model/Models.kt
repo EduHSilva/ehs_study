@@ -1,6 +1,6 @@
 package com.studyflow.app.data.model
 
-enum class TaskStatus { PENDING, DONE, DELAYED, DELETED }
+enum class TaskStatus { PENDING, WORKING, DONE, DELAYED, DELETED }
 
 enum class TaskType { UNIQUE, DAILY }
 
@@ -24,6 +24,9 @@ data class Task(
     val endDate: String?,
     val type: TaskType,
     val status: TaskStatus,
+    // Dia em que uma tarefa UNIQUE foi concluída. Concluída, o calendário mostra a tarefa só
+    // nesse dia; DAILY não usa (tem `dailyCompletions`).
+    val completedDate: String? = null,
     val projectId: String? = null,
     val stageId: String? = null,
     val dailyStatistics: DailyTaskStatistics?,
@@ -39,7 +42,11 @@ data class TaskInput(
     val stageId: String? = null,
 )
 
-/** Campos opcionais: o back só recebe o que for enviado (`UpdateTaskDTO`). */
+/**
+ * Campos opcionais: o back só recebe o que for enviado (`UpdateTaskDTO`).
+ * `clearProjectLink` envia `projectId`/`stageId` como null explícito, desvinculando a tarefa
+ * do projeto — sem ele, um id nulo é apenas omitido do corpo.
+ */
 data class TaskUpdate(
     val title: String? = null,
     val type: TaskType? = null,
@@ -49,6 +56,7 @@ data class TaskUpdate(
     val completionDate: String? = null,
     val projectId: String? = null,
     val stageId: String? = null,
+    val clearProjectLink: Boolean = false,
 )
 
 data class TaskPage(
@@ -74,7 +82,7 @@ data class DashboardData(
     val notes: List<NotePreview>,
 )
 
-enum class ProjectStatus { IN_PROGRESS, DONE }
+enum class ProjectStatus { WAITING, WORKING, DONE }
 
 data class Project(
     val id: String,
