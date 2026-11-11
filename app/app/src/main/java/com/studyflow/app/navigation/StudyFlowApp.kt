@@ -74,6 +74,7 @@ import com.studyflow.app.feature.auth.BrandMark
 import com.studyflow.app.feature.auth.SessionViewModel
 import com.studyflow.app.feature.dashboard.DashboardScreen
 import com.studyflow.app.feature.kanban.KanbanScreen
+import com.studyflow.app.feature.notes.NotesNavigation
 import com.studyflow.app.feature.notes.NotesScreen
 import com.studyflow.app.feature.pomodoro.PomodoroScreen
 import com.studyflow.app.feature.pomodoro.PomodoroWidget
@@ -226,7 +227,15 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
                     startDestination = Routes.DASHBOARD,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    composable(Routes.DASHBOARD) { DashboardScreen(onNavigate = go) }
+                    composable(Routes.DASHBOARD) {
+                        DashboardScreen(
+                            onNavigate = go,
+                            onOpenNote = { id ->
+                                NotesNavigation.request(id)
+                                go(Routes.NOTES)
+                            },
+                        )
+                    }
                     composable(Routes.POMODORO) { PomodoroScreen() }
                     composable(Routes.NOTES) { NotesScreen() }
                     composable(Routes.TASKS) { TasksScreen() }

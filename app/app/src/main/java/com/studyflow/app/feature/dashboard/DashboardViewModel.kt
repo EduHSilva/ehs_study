@@ -11,6 +11,7 @@ import com.studyflow.app.data.model.TaskUpdate
 import com.studyflow.app.data.repository.DashboardRepository
 import com.studyflow.app.data.repository.FocusRepository
 import com.studyflow.app.data.repository.TasksRepository
+import com.studyflow.app.domain.tasks.StudyCalendar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -33,6 +34,14 @@ data class DashboardUiState(
             val weekly = data?.weeklyProgress ?: return 0
             if (weekly.total == 0) return 0
             return Math.round(weekly.completed.toFloat() / weekly.total * 100)
+        }
+
+    // O dashboard do back pode vir com a janela das próximas 24h; "Tarefas de Hoje" mostra só as
+    // que ocupam o dia local atual, com o mesmo corte por dia (00:00–23:59) da tela de tarefas.
+    val todayTasks: List<Task>
+        get() {
+            val today = LocalDate.now().toString()
+            return data?.tasks.orEmpty().filter { StudyCalendar.taskCoversDay(it, today, today) }
         }
 }
 

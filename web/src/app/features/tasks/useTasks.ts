@@ -1,9 +1,10 @@
 import { computed, ref, watch } from 'vue'
+import { copyToClipboard } from '../../composables/useClipboard'
 import { useI18n } from '../../composables/useI18n'
 import { getProjectDetails, getProjects } from '../projects/projects.api'
 import { createTask, deleteTask, getTasksInRange, updateTask } from './tasks.api'
 import { buildCalendarGrid, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
-import { isoToLocalInput, localInputToIso } from './taskFormat'
+import { formatTaskList, isoToLocalInput, localInputToIso } from './taskFormat'
 import type { Project, ProjectStage } from '../projects/types'
 import type { Task, TaskInput, TaskStatus, TaskType } from './types'
 
@@ -14,15 +15,19 @@ export function useTasks() {
   const { t } = useI18n()
 
   // Período e calendário navegável
+  const todayKey = ref(dayKey(new Date()))
   const anchor = ref(startOfDay(new Date()))
   const mode = ref<'week' | 'month'>('week')
   const calendarLoading = ref(false)
 
   // Tarefas do período visível, usadas para pintar o calendário
   const periodTasks = ref<Task[]>([])
-  const selectedDay = ref<string | null>(null)
+  // A tela abre com o dia de hoje selecionado: sem isso a lista mostra as tarefas do período
+  // visível — ou a janela padrão do back, que não é o dia atual.
+  const selectedDay = ref<string | null>(todayKey.value)
 
   const items = ref<Task[]>([])
+  const filteredTasks = ref<Task[]>([])
   const loading = ref(true)
   const pageLoading = ref(false)
   const page = ref(0)
@@ -30,6 +35,8 @@ export function useTasks() {
   const savingId = ref<string | null>(null)
   const deletingId = ref<string | null>(null)
   const error = ref<string | null>(null)
+  const copied = ref(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
   const formOpen = ref(false)
   const title = ref('')
@@ -87,7 +94,6 @@ export function useTasks() {
     if (id) void loadStages(id)
   }, { flush: 'sync' })
 
-  const todayKey = ref(dayKey(new Date()))
   // O dia que o toggle vai atingir: o selecionado no calendário, senão hoje. O checkbox e a ação
   // usam o mesmo dia, senão a tela mostraria o estado de hoje enquanto o clique marcaria outro dia.
   const targetDay = computed(() => selectedDay.value ?? todayKey.value)
@@ -104,10 +110,25 @@ export function useTasks() {
   const dailyCount = computed(() => items.value.filter(item => item.type === 'DAILY').length)
 
   const paginate = (all: Task[]) => {
+    filteredTasks.value = all
     total.value = all.length
     const maxPage = Math.max(0, Math.ceil(all.length / PAGE_SIZE) - 1)
     if (page.value > maxPage) page.value = maxPage
     items.value = all.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE)
+  }
+
+  // Copia a lista filtrada inteira (não só a página visível) como checklist para colar fora do app.
+  const copyTasks = async (): Promise<boolean> => {
+    const text = formatTaskList(filteredTasks.value)
+    if (!text) return false
+    if (!(await copyToClipboard(text))) {
+      error.value = t('tasksCopyFailed')
+      return false
+    }
+    copied.value = true
+    if (copiedTimer) clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { copied.value = false }, 2000)
+    return true
   }
 
   const applyFilter = () => {
@@ -448,6 +469,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     error,
     savingId,
     deletingId,
+    copied,
     pendingCount,
     dailyCount,
     anchor,
@@ -479,6 +501,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     jumpTo,
     setMode,
     toggle,
+    copyTasks,
     remove,
     toggleForm,
     create,

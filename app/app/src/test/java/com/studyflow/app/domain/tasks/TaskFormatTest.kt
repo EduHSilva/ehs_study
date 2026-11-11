@@ -53,6 +53,18 @@ class TaskFormatTest {
     }
 
     @Test
+    fun `task list copies each title as a checklist line`() {
+        val list = TaskFormat.formatTaskList(listOf("Tarefa 1", "Tarefa 2"))
+
+        assertEquals("- [] Tarefa 1\n- [] Tarefa 2", list)
+    }
+
+    @Test
+    fun `empty task list copies nothing`() {
+        assertEquals("", TaskFormat.formatTaskList(emptyList()))
+    }
+
+    @Test
     fun `day chip renders weekday and day`() {
         val chip = TaskFormat.formatDayChip("2026-03-10", ptBr)
         assertTrue(chip.contains("10/03"))

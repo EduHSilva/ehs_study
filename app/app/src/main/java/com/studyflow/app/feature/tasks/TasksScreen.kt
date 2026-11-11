@@ -1,5 +1,8 @@
 package com.studyflow.app.feature.tasks
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -76,6 +80,7 @@ import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
 import com.studyflow.app.domain.tasks.TaskFormat
 import com.studyflow.app.ui.appViewModel
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.TextStyle
@@ -86,6 +91,18 @@ fun TasksScreen() {
     val vm: TasksViewModel = appViewModel { TasksViewModel(it.tasksRepository, it.projectsRepository) }
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStrings.current
+
+    val context = LocalContext.current
+    val clipboard = remember(context) {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(2000)
+            copied = false
+        }
+    }
 
     var title by rememberSaveable { mutableStateOf("") }
     var typeName by rememberSaveable { mutableStateOf(TaskType.UNIQUE.name) }
@@ -246,7 +263,28 @@ fun TasksScreen() {
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { Subtitle(s["tasksSubtitle"]) }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Subtitle(s["tasksSubtitle"], Modifier.weight(1f))
+                    TextButton(
+                        enabled = state.total > 0,
+                        onClick = {
+                            val text = vm.copyTasksText() ?: return@TextButton
+                            clipboard.setPrimaryClip(ClipData.newPlainText(s["tasks"], text))
+                            copied = true
+                        },
+                    ) {
+                        Text(
+                            if (copied) s["tasksCopied"] else s["copyTasksAction"],
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
+            }
 
             if (state.errorKey != null) {
                 item {

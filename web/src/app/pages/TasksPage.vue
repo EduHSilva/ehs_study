@@ -14,7 +14,7 @@ import type { Task } from '../features/tasks/types'
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
 const { student } = useStudentProfile()
-const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, remove, toggleForm, create, openEdit, submitForm } = useTasks()
+const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, copied, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, copyTasks, remove, toggleForm, create, openEdit, submitForm } = useTasks()
 onMounted(load)
 
 const formEl = ref<HTMLFormElement | null>(null)
@@ -57,7 +57,7 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
 }
 </script>
 <template>
-  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="tasks" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('tasks') }}</h1><p>{{ t('tasksSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
+  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="tasks" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('tasks') }}</h1><p>{{ t('tasksSubtitle') }}</p></div><div class="header-actions"><button class="button secondary" :disabled="!total" @click="copyTasks">{{ copied ? t('tasksCopied') : t('copyTasksAction') }}</button><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
 
     <article class="card calendar-card" :aria-busy="calendarLoading">

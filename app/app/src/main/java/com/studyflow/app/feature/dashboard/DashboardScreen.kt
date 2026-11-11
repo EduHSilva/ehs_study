@@ -48,7 +48,7 @@ import com.studyflow.app.ui.LocalContainer
 import com.studyflow.app.ui.appViewModel
 
 @Composable
-fun DashboardScreen(onNavigate: (String) -> Unit) {
+fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) {
     val vm: DashboardViewModel = appViewModel {
         DashboardViewModel(it.dashboardRepository, it.focusRepository, it.tasksRepository)
     }
@@ -76,6 +76,8 @@ fun DashboardScreen(onNavigate: (String) -> Unit) {
         }
         return
     }
+
+    val todayTasks = state.todayTasks
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -235,13 +237,13 @@ fun DashboardScreen(onNavigate: (String) -> Unit) {
                         LinkButton(text = s["seeAll"], onClick = { onNavigate(Routes.TASKS) })
                     },
                 )
-                if (data.tasks.isEmpty()) {
+                if (todayTasks.isEmpty()) {
                     Spacer(Modifier.height(12.dp))
                     EmptyNote(s["noTasks"])
                 } else {
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        data.tasks.forEach { task ->
+                        todayTasks.forEach { task ->
                             DashboardTaskRow(
                                 task = task,
                                 saving = state.savingTaskId == task.id,
@@ -266,6 +268,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
+                                    .clickable { onOpenNote(note.id) }
                                     .padding(14.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {

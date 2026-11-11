@@ -15,6 +15,7 @@ import com.studyflow.app.data.repository.TasksRepository
 import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
+import com.studyflow.app.domain.tasks.TaskFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,8 +41,12 @@ data class TasksUiState(
     val anchor: LocalDate = LocalDate.now(),
     val mode: CalendarMode = CalendarMode.WEEK,
     val periodTasks: List<Task> = emptyList(),
-    val selectedDay: String? = null,
+    // A tela abre com o dia de hoje selecionado: sem isso a lista mostra o período visível — ou a
+    // janela padrão do back, que não é o dia atual.
     val todayKey: String = LocalDate.now().toString(),
+    val selectedDay: String? = todayKey,
+    // Lista já filtrada (todas as páginas), usada pelo "copiar tarefas".
+    val filteredTasks: List<Task> = emptyList(),
     val formOpen: Boolean = false,
     val creating: Boolean = false,
     val updating: Boolean = false,
@@ -155,6 +160,7 @@ class TasksViewModel(
                 total = all.size,
                 page = page,
                 items = all.drop(page * TASKS_PAGE_SIZE).take(TASKS_PAGE_SIZE),
+                filteredTasks = all,
             )
         }
     }
@@ -265,6 +271,10 @@ class TasksViewModel(
     }
 
     fun isDone(task: Task): Boolean = isDone(task, _state.value)
+
+    // Copia a lista filtrada inteira (não só a página visível) como checklist para colar fora do app.
+    fun copyTasksText(): String? =
+        TaskFormat.formatTaskList(_state.value.filteredTasks.map { it.title }).ifEmpty { null }
 
     private fun isDone(task: Task, current: TasksUiState): Boolean =
         (task.type == TaskType.DAILY &&
