@@ -45,7 +45,7 @@ interface TaskPagePayload {
   items?: TaskPayload[]
 }
 
-const TASK_STATUSES: TaskStatus[] = ['PENDING', 'DONE', 'DELAYED', 'DELETED']
+const TASK_STATUSES: TaskStatus[] = ['PENDING', 'WORKING', 'DONE', 'DELAYED', 'DELETED']
 const TASK_TYPES: TaskType[] = ['UNIQUE', 'DAILY']
 
 function taskHeaders(): Record<string, string> {
@@ -179,6 +179,21 @@ export async function getTasksForProject(projectId: string, size = RANGE_PAGE_SI
   const wideTo = dayKey(new Date(today.getFullYear() + 2, 11, 31))
   const tasks = await fetchAllPages(`&start=${wideFrom}&end=${wideTo}&projectId=${encodeURIComponent(projectId)}`, size)
   return tasks.filter(task => task.status !== 'DELETED')
+}
+
+// O Kanban mostra todas as tarefas, sem recorte de período. A janela larga evita o padrão
+// `[hoje, +7 dias]` do back e, se o filtro de período falhar, cai para a listagem sem params.
+export async function getAllTasks(size = RANGE_PAGE_SIZE): Promise<Task[]> {
+  const today = new Date()
+  const wideFrom = dayKey(new Date(today.getFullYear() - 2, 0, 1))
+  const wideTo = dayKey(new Date(today.getFullYear() + 2, 11, 31))
+  let collected: Task[]
+  try {
+    collected = await fetchAllPages(`&start=${wideFrom}&end=${wideTo}`, size)
+  } catch {
+    collected = await fetchAllPages('', size)
+  }
+  return collected.filter(task => task.status !== 'DELETED')
 }
 
 export async function createTask(input: TaskInput): Promise<Task> {

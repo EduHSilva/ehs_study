@@ -1,4 +1,4 @@
-export type ProjectStatus = 'Em andamento' | 'Concluído'
+export type ProjectStatus = 'Pendente' | 'Em andamento' | 'Concluído'
 
 export interface Project { id: string; title: string; progress: number; status: ProjectStatus; advisor: string }
 export interface ProjectStage { id: string; name: string; done: boolean }

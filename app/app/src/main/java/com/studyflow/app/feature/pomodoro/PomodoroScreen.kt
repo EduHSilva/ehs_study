@@ -49,7 +49,9 @@ import com.studyflow.app.ui.appViewModel
 
 @Composable
 fun PomodoroScreen() {
-    val vm: PomodoroViewModel = appViewModel { PomodoroViewModel(it.focusRepository, it.settings) }
+    val vm: PomodoroViewModel = appViewModel {
+        PomodoroViewModel(it.focusRepository, it.settings, it.pomodoroTimer)
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStrings.current
 
@@ -88,7 +90,7 @@ fun PomodoroScreen() {
                     contentAlignment = Alignment.Center,
                 ) {
                     TimerRing(
-                        seconds = state.seconds,
+                        seconds = state.timer.remainingSeconds,
                         total = if (state.breakMode) BREAK_SECONDS else FOCUS_SECONDS,
                     ) {
                         Column(
@@ -112,7 +114,27 @@ fun PomodoroScreen() {
                         }
                     }
                 }
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(20.dp))
+                if (state.completed) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            s[if (state.breakMode) "breakComplete" else "focusComplete"],
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = StudyFlowTheme.colors.success,
+                        )
+                        Text(
+                            s[if (state.breakMode) "breakCompleteHint" else "registerFocusHint"],
+                            style = MaterialTheme.typography.bodySmall,
+                            color = StudyFlowTheme.colors.subtle,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -123,11 +145,13 @@ fun PomodoroScreen() {
                         modifier = Modifier.weight(1f).height(42.dp),
                         shape = RoundedCornerShape(8.dp),
                     ) { Text(s["reset"]) }
-                    Button(
-                        onClick = vm::toggleTimer,
-                        modifier = Modifier.weight(1f).height(42.dp),
-                        shape = RoundedCornerShape(8.dp),
-                    ) { Text(if (state.running) s["pause"] else s["start"]) }
+                    if (!state.completed) {
+                        Button(
+                            onClick = vm::toggleTimer,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) { Text(if (state.running) s["pause"] else s["start"]) }
+                    }
                     if (state.focusStarted && !state.breakMode) {
                         Button(
                             onClick = vm::finishSession,

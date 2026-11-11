@@ -1,6 +1,7 @@
 package com.studyflow.app.data.remote
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -76,6 +77,7 @@ data class TaskDto(
     val type: String? = null,
     val status: String? = null,
     val completed: Boolean? = null,
+    val completedDate: String? = null,
     val projectId: String? = null,
     val stageId: String? = null,
     val dailyStatistics: DailyStatsDto? = null,
@@ -100,6 +102,10 @@ data class CreateTaskRequest(
     val stageId: String? = null,
 )
 
+/**
+ * `projectId`/`stageId` são `JsonElement` porque o cliente precisa distinguir "não enviar"
+ * (null omitido) de "enviar null" (JsonNull), que é como o web desvincula a tarefa do projeto.
+ */
 @Serializable
 data class UpdateTaskRequest(
     val title: String? = null,
@@ -108,8 +114,8 @@ data class UpdateTaskRequest(
     val endDate: String? = null,
     val status: String? = null,
     val completionDate: String? = null,
-    val projectId: String? = null,
-    val stageId: String? = null,
+    val projectId: JsonElement? = null,
+    val stageId: JsonElement? = null,
 )
 
 // ---------------------------------------------------------------------------
@@ -219,6 +225,13 @@ data class CreateProjectRequest(
     val title: String,
     val status: String = "WAITING",
     val advisor: String? = null,
+)
+
+@Serializable
+data class UpdateProjectRequest(
+    val title: String,
+    val advisor: String? = null,
+    val status: String? = null,
 )
 
 @Serializable

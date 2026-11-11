@@ -32,13 +32,13 @@ interface ProjectPagePayload {
 }
 
 const STATUS_LABELS: Record<string, Project['status']> = {
-  WAITING: 'Em andamento',
-  IN_PROGRESS: 'Em andamento',
+  WAITING: 'Pendente',
+  WORKING: 'Em andamento',
   DONE: 'Concluído'
 }
 
 function toStatus(value: string | null | undefined): Project['status'] {
-  return (value && STATUS_LABELS[value]) || 'Em andamento'
+  return (value && STATUS_LABELS[value]) || 'Pendente'
 }
 
 function toProject(payload: ProjectPayload): Project {
@@ -84,7 +84,7 @@ export async function createProject(title: string, advisor: string): Promise<Pro
 // `status` ausente preserva o status atual no back; `advisor` nulo limpa o responsável.
 export async function updateProject(
   id: string,
-  input: { title: string; advisor: string; status?: 'WAITING' | 'DONE' }
+  input: { title: string; advisor: string; status?: 'WAITING' | 'WORKING' | 'DONE' }
 ): Promise<ProjectDetails> {
   const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>(`/study/projects/${id}`, {
     method: 'PUT',

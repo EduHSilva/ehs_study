@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +71,7 @@ import com.studyflow.app.core.ui.theme.StudyFlowTheme
 import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.model.TaskStatus
 import com.studyflow.app.data.model.TaskType
+import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
 import com.studyflow.app.domain.tasks.TaskFormat
@@ -101,6 +103,16 @@ fun TasksScreen() {
         }
     }
 
+    LaunchedEffect(state.editingId) {
+        val task = state.editingTask ?: return@LaunchedEffect
+        title = task.title
+        typeName = task.type.name
+        startDate = ApiDates.localDateTimeOrNull(task.startDate)
+        endDate = ApiDates.localDateTimeOrNull(task.endDate)
+    }
+
+    val formBusy = state.creating || state.updating
+
     if (state.formOpen) {
         ModalBottomSheet(
             onDismissRequest = vm::toggleForm,
@@ -115,7 +127,21 @@ fun TasksScreen() {
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(s["addTaskAction"], style = MaterialTheme.typography.titleLarge)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (state.editingId != null) s["editTaskTitle"] else s["addTaskAction"],
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    state.editingTask?.takeIf { state.editingId != null }?.let { task ->
+                        Text(
+                            task.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -129,7 +155,7 @@ fun TasksScreen() {
                     selectedIndex = if (type == TaskType.UNIQUE) 0 else 1,
                     onSelect = { index -> typeName = if (index == 0) TaskType.UNIQUE.name else TaskType.DAILY.name },
                 )
-                if (type == TaskType.UNIQUE) {
+                if (type == TaskType.UNIQUE || state.editingId != null) {
                     DateTimeField(
                         label = s["taskStartDateLabel"],
                         value = startDate,
@@ -170,17 +196,17 @@ fun TasksScreen() {
                 ) {
                     OutlinedButton(
                         onClick = vm::toggleForm,
-                        enabled = !state.creating,
+                        enabled = !formBusy,
                         modifier = Modifier.weight(1f).height(44.dp),
                         shape = RoundedCornerShape(8.dp),
                     ) { Text(s["cancelAction"]) }
                     Button(
-                        onClick = { vm.create(title, startDate, endDate, type) },
-                        enabled = !state.creating,
+                        onClick = { vm.submitForm(title, startDate, endDate, type) },
+                        enabled = !formBusy,
                         modifier = Modifier.weight(1f).height(44.dp),
                         shape = RoundedCornerShape(8.dp),
                     ) {
-                        if (state.creating) {
+                        if (formBusy) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
@@ -188,7 +214,13 @@ fun TasksScreen() {
                             )
                             Spacer(Modifier.width(6.dp))
                         }
-                        Text(if (state.creating) s["saving"] else s["taskSaveAction"])
+                        Text(
+                            when {
+                                formBusy -> s["saving"]
+                                state.editingId != null -> s["saveChangesAction"]
+                                else -> s["taskSaveAction"]
+                            },
+                        )
                     }
                 }
             }
@@ -255,6 +287,7 @@ fun TasksScreen() {
                                         state.stagesByProject[pid]?.firstOrNull { it.id == task.stageId }?.name
                                     },
                                     onToggle = { vm.toggle(task.id) },
+                                    onEdit = { vm.openEdit(task) },
                                     onDelete = { vm.remove(task.id) },
                                 )
                             }
@@ -501,6 +534,7 @@ private fun TaskRow(
     projectName: String?,
     stageName: String?,
     onToggle: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
@@ -570,6 +604,14 @@ private fun TaskRow(
             if (task.status == TaskStatus.DELAYED) {
                 Tag(text = s["taskDelayed"])
             }
+        }
+        IconButton(onClick = onEdit, enabled = !deleting) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = s["taskEditAction"],
+                tint = StudyFlowTheme.colors.subtle,
+                modifier = Modifier.size(16.dp),
+            )
         }
         IconButton(onClick = onDelete, enabled = !deleting) {
             if (deleting) {

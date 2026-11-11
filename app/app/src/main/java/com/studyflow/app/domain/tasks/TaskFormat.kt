@@ -30,6 +30,13 @@ object TaskFormat {
         return DateTimeFormatter.ofPattern("dd MMM", locale).format(dateTime)
     }
 
+    fun formatVersionDue(value: String?, locale: Locale): String {
+        val dateTime = ApiDates.localDateTimeOrNull(value) ?: return value ?: "—"
+        val date = DateTimeFormatter.ofPattern("dd MMM yyyy", locale).format(dateTime)
+        val time = DateTimeFormatter.ofPattern("HH:mm", locale).format(dateTime)
+        return "$date · $time"
+    }
+
     fun formatDayChip(key: String, locale: Locale): String {
         val date = runCatching { StudyCalendar.parseDayKey(key) }.getOrNull() ?: return key
         return DateTimeFormatter.ofPattern("EEE, dd/MM", locale).format(date)

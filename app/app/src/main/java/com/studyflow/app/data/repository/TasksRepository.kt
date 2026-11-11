@@ -13,6 +13,9 @@ import com.studyflow.app.data.remote.UpdateTaskRequest
 import com.studyflow.app.core.network.unwrap
 import com.studyflow.app.domain.tasks.StudyCalendar
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.LocalDate
 
 class TasksRepository(private val api: TasksApi) {
@@ -88,6 +91,25 @@ class TasksRepository(private val api: TasksApi) {
         return tasks.filter { it.status != TaskStatus.DELETED }
     }
 
+    /**
+     * Acervo inteiro para o Kanban, sem recorte de período. A janela larga evita o padrão
+     * `[hoje, +7 dias]` do back e, se o filtro de período falhar, cai para a listagem sem params.
+     */
+    suspend fun getAll(): List<Task> {
+        val today = LocalDate.now()
+        val tasks = try {
+            fetchAllPages(
+                start = LocalDate.of(today.year - 2, 1, 1).toString(),
+                end = LocalDate.of(today.year + 2, 12, 31).toString(),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            fetchAllPages(start = null, end = null)
+        }
+        return tasks.filter { it.status != TaskStatus.DELETED }
+    }
+
     suspend fun create(input: TaskInput): Task {
         val payload = api.create(
             CreateTaskRequest(
@@ -103,6 +125,18 @@ class TasksRepository(private val api: TasksApi) {
     }
 
     suspend fun update(id: String, update: TaskUpdate): Task {
+        // `null` em projectId/stageId é omitido pelo Json (explicitNulls = false); o JsonNull
+        // explícito é o que desvincula a tarefa do projeto, igual ao web.
+        val projectId: JsonElement? = when {
+            update.clearProjectLink -> JsonNull
+            update.projectId != null -> JsonPrimitive(update.projectId)
+            else -> null
+        }
+        val stageId: JsonElement? = when {
+            update.clearProjectLink -> JsonNull
+            update.projectId != null -> update.stageId?.let(::JsonPrimitive) ?: JsonNull
+            else -> null
+        }
         val payload = api.update(
             id,
             UpdateTaskRequest(
@@ -112,8 +146,8 @@ class TasksRepository(private val api: TasksApi) {
                 endDate = update.endDate,
                 status = update.status?.name,
                 completionDate = update.completionDate,
-                projectId = update.projectId,
-                stageId = update.stageId,
+                projectId = projectId,
+                stageId = stageId,
             ),
         ).unwrap()
         return Mappers.task(payload)

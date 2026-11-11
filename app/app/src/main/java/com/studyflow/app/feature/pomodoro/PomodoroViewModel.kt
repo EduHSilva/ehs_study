@@ -6,127 +6,96 @@ import com.studyflow.app.core.settings.AppSettings
 import com.studyflow.app.data.model.FocusSession
 import com.studyflow.app.data.repository.FocusRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.max
-import kotlin.math.roundToInt
-
-const val FOCUS_SECONDS = 25 * 60
-const val BREAK_SECONDS = 5 * 60
 
 data class PomodoroUiState(
     val sessions: List<FocusSession> = emptyList(),
     val loading: Boolean = true,
     val saving: Boolean = false,
     val errorKey: String? = null,
-    val running: Boolean = false,
-    val breakMode: Boolean = false,
-    val seconds: Int = FOCUS_SECONDS,
-    val focusStarted: Boolean = false,
+    val timer: PomodoroTimerState = PomodoroTimerState(),
 ) {
     val sessionNumber: Int get() = (sessions.size % 4) + 1
-    val time: String get() = "%02d:%02d".format(seconds / 60, seconds % 60)
+    val time: String get() = timer.timeLeft
+    val running: Boolean get() = timer.running
+    val breakMode: Boolean get() = timer.mode == TimerMode.BREAK
+    val completed: Boolean get() = timer.completed
+    val focusStarted: Boolean get() = timer.started
 }
+
+private data class SessionsState(
+    val sessions: List<FocusSession> = emptyList(),
+    val loading: Boolean = true,
+    val saving: Boolean = false,
+    val errorKey: String? = null,
+)
 
 class PomodoroViewModel(
     private val focusRepository: FocusRepository,
     private val settings: AppSettings,
+    private val timer: PomodoroTimer,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(PomodoroUiState())
-    val state: StateFlow<PomodoroUiState> = _state.asStateFlow()
+    private val _sessions = MutableStateFlow(SessionsState())
+
+    val state: StateFlow<PomodoroUiState> = combine(_sessions, timer.state) { sessions, timerState ->
+        PomodoroUiState(
+            sessions = sessions.sessions,
+            loading = sessions.loading,
+            saving = sessions.saving,
+            errorKey = sessions.errorKey,
+            timer = timerState,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, PomodoroUiState())
 
     init {
         load()
-        // Cronômetro roda no cliente (como no web); só "Finalizar sessão" persiste no back.
-        viewModelScope.launch {
-            while (isActive) {
-                delay(1_000)
-                tick()
-            }
-        }
     }
 
     fun load() {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            _sessions.update { it.copy(loading = true, errorKey = null) }
             try {
                 val sessions = focusRepository.getTodaySessions()
-                _state.update { it.copy(sessions = sessions, loading = false, errorKey = null) }
+                _sessions.update { it.copy(sessions = sessions, loading = false, errorKey = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "pomodoroLoadFailed") }
+                _sessions.update { it.copy(loading = false, errorKey = "pomodoroLoadFailed") }
             }
         }
     }
 
-    private fun tick() {
-        _state.update { current ->
-            if (!current.running || current.seconds <= 0) return@update current
-            val next = current.seconds - 1
-            if (next <= 0) current.copy(seconds = 0, running = false) else current.copy(seconds = next)
-        }
-    }
+    fun toggleTimer() = timer.toggle()
 
-    fun toggleTimer() {
-        _state.update { current ->
-            if (current.running) {
-                current.copy(running = false)
-            } else {
-                current.copy(running = true, focusStarted = current.focusStarted || !current.breakMode)
-            }
-        }
-    }
+    fun reset() = timer.reset()
 
-    fun reset() {
-        _state.update {
-            it.copy(
-                running = false,
-                focusStarted = false,
-                seconds = if (it.breakMode) BREAK_SECONDS else FOCUS_SECONDS,
-            )
-        }
-    }
-
-    fun setMode(breakMode: Boolean) {
-        _state.update {
-            it.copy(
-                breakMode = breakMode,
-                running = false,
-                focusStarted = false,
-                seconds = if (breakMode) BREAK_SECONDS else FOCUS_SECONDS,
-            )
-        }
-    }
+    fun setMode(breakMode: Boolean) =
+        timer.setMode(if (breakMode) TimerMode.BREAK else TimerMode.FOCUS)
 
     fun finishSession() {
-        val current = _state.value
-        if (!current.focusStarted || current.breakMode || current.saving) return
-        val elapsedSeconds = FOCUS_SECONDS - current.seconds
-        if (elapsedSeconds <= 0) return
-        val minutes = max(1, (elapsedSeconds / 60.0).roundToInt())
-        _state.update { it.copy(running = false, saving = true, errorKey = null) }
+        val timerState = timer.state.value
+        if (!timerState.started || timerState.mode != TimerMode.FOCUS || _sessions.value.saving) return
+        val minutes = timerState.elapsedMinutes
+        if (minutes <= 0) return
+        _sessions.update { it.copy(saving = true, errorKey = null) }
         viewModelScope.launch {
             try {
                 val session = focusRepository.createSession(settings.strings()["focusSessionTitle"], minutes)
-                _state.update {
-                    it.copy(
-                        sessions = listOf(session) + it.sessions,
-                        saving = false,
-                        focusStarted = false,
-                        seconds = FOCUS_SECONDS,
-                    )
+                _sessions.update {
+                    it.copy(sessions = listOf(session) + it.sessions, saving = false)
                 }
+                timer.reset()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(saving = false, errorKey = "sessionSaveFailed") }
+                _sessions.update { it.copy(saving = false, errorKey = "sessionSaveFailed") }
             }
         }
     }

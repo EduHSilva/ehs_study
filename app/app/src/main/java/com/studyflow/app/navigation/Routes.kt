@@ -5,6 +5,7 @@ object Routes {
     const val POMODORO = "pomodoro"
     const val NOTES = "notes"
     const val TASKS = "tasks"
+    const val KANBAN = "kanban"
     const val PROJECTS = "projects"
     const val PROFILE = "profile"
     const val REVIEW = "review"

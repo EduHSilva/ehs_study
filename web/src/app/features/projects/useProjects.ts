@@ -6,12 +6,14 @@ import { isTaskDone } from '../tasks/calendar'
 import type { Task } from '../tasks/types'
 import type { Project, ProjectDetails } from './types'
 
-// Concluídos ficam no fim; os em andamento em ordem alfabética.
+// Pendentes primeiro, depois em andamento e concluídos no fim; cada grupo em ordem alfabética.
+const statusRank = (status: Project['status']) =>
+  status === 'Concluído' ? 2 : status === 'Em andamento' ? 1 : 0
+
 const sortProjects = (list: Project[]): Project[] =>
   [...list].sort((a, b) => {
-    const aDone = a.status === 'Concluído'
-    const bDone = b.status === 'Concluído'
-    if (aDone !== bDone) return aDone ? 1 : -1
+    const rank = statusRank(a.status) - statusRank(b.status)
+    if (rank !== 0) return rank
     return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
   })
 

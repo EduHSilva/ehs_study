@@ -1,11 +1,11 @@
 package com.studyflow.app.feature.notes
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +50,7 @@ import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.Subtitle
 import com.studyflow.app.core.ui.theme.StudyFlowTheme
+import com.studyflow.app.domain.notes.NoteFormat
 import com.studyflow.app.ui.appViewModel
 
 @Composable
@@ -206,7 +207,10 @@ fun NotesScreen() {
                                         if (selected) StudyFlowTheme.colors.primarySoft else androidx.compose.ui.graphics.Color.Transparent,
                                         RoundedCornerShape(8.dp),
                                     )
-                                    .clickable { vm.selectFolder(folder.id) }
+                                    .clickable {
+                                        creatingNote = false
+                                        vm.selectFolder(folder.id)
+                                    }
                                     .padding(start = 10.dp, top = 6.dp, bottom = 6.dp, end = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -225,6 +229,25 @@ fun NotesScreen() {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                if (folder.notes.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                if (selected) MaterialTheme.colorScheme.surface
+                                                else MaterialTheme.colorScheme.background,
+                                                RoundedCornerShape(999.dp),
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    ) {
+                                        Text(
+                                            folder.notes.size.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (selected) MaterialTheme.colorScheme.primary
+                                            else StudyFlowTheme.colors.subtle,
+                                        )
+                                    }
+                                }
                                 IconButton(
                                     onClick = {
                                         renamingFolder = folder.id
@@ -261,31 +284,47 @@ fun NotesScreen() {
 
         item {
             ContentCard {
-                CardTitle(
-                    title = s["folderNotesTitle"],
-                    action = {
-                        if (state.selectedFolderId != null && !creatingNote) {
-                            TextButton(
-                                onClick = {
-                                    creatingNote = true
-                                    title = ""
-                                    content = ""
-                                },
-                            ) {
-                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.size(4.dp))
-                                Text(s["newNote"])
-                            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            state.selectedFolder?.name ?: s["folderNotesTitle"],
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (state.selectedFolder != null) {
+                            Text(
+                                s.format("noteCount", "count" to state.folderNotes.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = StudyFlowTheme.colors.subtle,
+                            )
                         }
-                    },
-                )
+                    }
+                    if (state.selectedFolderId != null && !creatingNote) {
+                        TextButton(
+                            onClick = {
+                                creatingNote = true
+                                title = ""
+                                content = ""
+                            },
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text(s["newNote"])
+                        }
+                    }
+                }
 
                 val notes = state.folderNotes
                 if (notes.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
-                    NoteChips(
+                    NoteCards(
                         notes = notes,
-                        selectedNoteId = state.selectedNoteId,
+                        selectedNoteId = if (creatingNote) null else state.selectedNoteId,
                         onSelect = { id ->
                             creatingNote = false
                             vm.selectNote(id)
@@ -328,6 +367,7 @@ fun NotesScreen() {
                     )
 
                     state.selectedFolderId == null -> EmptyNote(s["selectFolderForNotes"])
+                    notes.isNotEmpty() -> EmptyNote(s["selectNoteHint"])
                     else -> EmptyNote(s["noNotesInFolder"])
                 }
             }
@@ -335,35 +375,52 @@ fun NotesScreen() {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoteChips(
+private fun NoteCards(
     notes: List<com.studyflow.app.data.model.Note>,
     selectedNoteId: String?,
     onSelect: (String) -> Unit,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    val s = LocalStrings.current
+    val colors = StudyFlowTheme.colors
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         notes.forEach { note ->
             val selected = note.id == selectedNoteId
-            Row(
+            Column(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .background(
-                        if (selected) StudyFlowTheme.colors.primarySoft else MaterialTheme.colorScheme.background,
-                        RoundedCornerShape(8.dp),
+                        if (selected) colors.primarySoft else MaterialTheme.colorScheme.background,
+                        RoundedCornerShape(12.dp),
+                    )
+                    .border(
+                        1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary else colors.border,
+                        RoundedCornerShape(12.dp),
                     )
                     .clickable { onSelect(note.id) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    note.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    NoteFormat.title(note.title, s["untitledNote"]),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    NoteFormat.preview(note.content).ifEmpty { s["noNotePreview"] },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    s.format("noteWordCount", "count" to NoteFormat.wordCount(note.content)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) MaterialTheme.colorScheme.primary else colors.subtle,
                 )
             }
         }

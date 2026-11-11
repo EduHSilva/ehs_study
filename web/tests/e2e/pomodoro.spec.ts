@@ -69,6 +69,11 @@ test('retoma o cronômetro após recarregar a página', async ({ page }) => {
 
   await page.reload()
 
+  // A página aberta também sobrevive ao F5, então o cronômetro continua na tela cheia.
+  await expect(page.getByRole('heading', { name: 'Cronômetro Pomodoro' })).toBeVisible()
+  await expect(page.getByText(/2[45]:\d{2}/)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Dashboard' }).click()
   const widget = page.locator('.pomodoro-widget')
   await expect(widget).toBeVisible()
   await expect(widget.getByText(/2[45]:\d{2}/)).toBeVisible()

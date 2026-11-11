@@ -1,4 +1,4 @@
-export type TaskStatus = 'PENDING' | 'DONE' | 'DELAYED' | 'DELETED'
+export type TaskStatus = 'PENDING' | 'WORKING' | 'DONE' | 'DELAYED' | 'DELETED'
 export type TaskType = 'UNIQUE' | 'DAILY'
 
 // Agregados que o backend expõe para tarefas DAILY: a conclusão é salva dia a dia
