@@ -3,6 +3,14 @@ import { useI18n } from '../../composables/useI18n'
 import { createFolder, createNote as createNoteRequest, deleteFolder, deleteNote, getFolders, renameFolder as renameFolderRequest, saveNote } from './notes.api'
 import type { NoteFolder } from './types'
 
+// Nota que outra tela (o dashboard) pediu para abrir. O pedido é consumido no próximo `load`,
+// quando as pastas chegam e dá para localizar a nota.
+const requestedNoteId = ref<string | null>(null)
+
+export const requestOpenNote = (id: string) => {
+  requestedNoteId.value = id
+}
+
 export function useNotes() {
   const { t } = useI18n()
   const folders = ref<NoteFolder[]>([])
@@ -17,13 +25,18 @@ export function useNotes() {
   const selectedNote = computed(() => folderNotes.value.find(note => note.id === selectedNoteId.value) ?? null)
 
   const load = async () => {
+    const requested = requestedNoteId.value
+    requestedNoteId.value = null
     try {
       loading.value = true
       error.value = null
       folders.value = await getFolders()
-      const firstFolder = folders.value[0] ?? null
+      const requestedFolder = requested
+        ? folders.value.find(folder => folder.notes.some(note => note.id === requested)) ?? null
+        : null
+      const firstFolder = requestedFolder ?? folders.value[0] ?? null
       selectedFolderId.value = firstFolder?.id ?? null
-      selectedNoteId.value = firstFolder?.notes[0]?.id ?? null
+      selectedNoteId.value = requestedFolder ? requested : firstFolder?.notes[0]?.id ?? null
     } catch {
       error.value = t('notesLoadFailed')
     } finally {

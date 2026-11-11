@@ -6,16 +6,21 @@ import LanguageToggle from '../components/LanguageToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
 
-defineEmits<{ navigate: [page: AppPage] }>()
+const emit = defineEmits<{ navigate: [page: AppPage] }>()
 import { useStudentProfile } from '../features/auth/useAuth'
 import { useDashboard } from '../features/dashboard/useDashboard'
+import { requestOpenNote } from '../features/notes/useNotes'
 import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
 import { formatEndDate } from '../features/tasks/taskFormat'
 
 const { t, locale } = useI18n()
 const { student } = useStudentProfile()
 const firstName = computed(() => student.value.name.split(' ')[0])
-const { data, focus, loading, error, progress, savingTaskId, load, toggleTask } = useDashboard()
+const { data, focus, tasks, loading, error, progress, savingTaskId, load, toggleTask } = useDashboard()
+const openNote = (id: string) => {
+  requestOpenNote(id)
+  emit('navigate', 'notes')
+}
 const {
   mode: timerMode,
   running: timerRunning,
@@ -52,11 +57,16 @@ const focusTime = computed(() => {
           </article>
         </div>
         <div class="right-column">
-          <article class="card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in data.tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button></div></article>
-          <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-grid"><article v-for="note in data.notes" :key="note.id" class="note"><strong>{{ note.title }}</strong><small>{{ note.content }}</small></article></div></article>
+          <article class="card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button></div></article>
+          <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-grid"><button v-for="note in data.notes" :key="note.id" type="button" class="note" @click="openNote(note.id)"><strong>{{ note.title }}</strong><small>{{ note.content }}</small></button></div></article>
         </div>
       </div>
     </section>
   </main>
   <main v-else class="loading">{{ loading ? t('dashboardLoading') : t('dashboardError') }}</main>
 </template>
+
+<style scoped>
+.note{width:100%;text-align:left;color:var(--color-text);font:inherit;cursor:pointer}
+.note:hover{border-color:var(--color-border-strong)}
+</style>

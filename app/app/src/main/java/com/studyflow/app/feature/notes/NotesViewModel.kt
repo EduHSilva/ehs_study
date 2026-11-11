@@ -81,6 +81,14 @@ class NotesViewModel(
         _state.update { it.copy(selectedNoteId = id, savedMessageKey = null) }
     }
 
+    /** Seleciona a pasta e a nota pedidas por outra tela; false quando a nota não existe mais. */
+    fun openNote(id: String): Boolean {
+        val folder = _state.value.folders.firstOrNull { candidate -> candidate.notes.any { it.id == id } }
+            ?: return false
+        _state.update { it.copy(selectedFolderId = folder.id, selectedNoteId = id, savedMessageKey = null) }
+        return true
+    }
+
     fun saveSelected(title: String, content: String) {
         val note = _state.value.selectedNote ?: return
         if (_state.value.saving) return

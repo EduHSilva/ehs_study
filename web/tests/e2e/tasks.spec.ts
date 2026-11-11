@@ -126,6 +126,44 @@ test('tarefa única concluída aparece só no dia da execução no calendário',
   }
 })
 
+test('abre a lista no dia atual, sem as tarefas das próximas 24h', async ({ page }) => {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(9, 0, 0, 0)
+
+  const tomorrowTask: MockTask = {
+    ...TASK,
+    id: 'task-tomorrow',
+    title: 'Entregar amanhã',
+    startDate: tomorrow.toISOString(),
+    endDate: tomorrow.toISOString(),
+    projectId: null,
+    stageId: null
+  }
+  const state = stateWithTask()
+  state.tasks = [structuredClone(TASK), tomorrowTask]
+  await signIn(page)
+  await mockApi(page, state)
+  await openTasks(page)
+
+  await expect(page.locator('.calendar-filter')).toContainText('Filtrando por')
+  await expect(page.locator('.task-row')).toContainText('Revisar capítulo 2')
+  await expect(page.getByText('Entregar amanhã')).toBeHidden()
+})
+
+test('copia as tarefas do dia como checklist', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await signIn(page)
+  await mockApi(page, stateWithTask())
+  await openTasks(page)
+
+  await page.getByRole('button', { name: 'Copiar tarefas' }).click()
+  await expect(page.getByRole('button', { name: 'Copiado!' })).toBeVisible()
+
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText())
+  expect(clipboard).toBe('- [] Revisar capítulo 2')
+})
+
 test('cancelar a edição volta o formulário para o modo de criação', async ({ page }) => {
   await signIn(page)
   await mockApi(page, stateWithTask())

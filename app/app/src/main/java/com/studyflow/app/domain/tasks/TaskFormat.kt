@@ -25,6 +25,9 @@ object TaskFormat {
         return "${dayStamp(start, locale)} → $end"
     }
 
+    /** Lista pronta para colar fora do app, no formato de checklist (`- [] título`). */
+    fun formatTaskList(titles: List<String>): String = titles.joinToString("\n") { "- [] $it" }
+
     fun formatCompactDate(value: String?, locale: Locale): String {
         val dateTime = ApiDates.localDateTimeOrNull(value) ?: return value ?: "—"
         return DateTimeFormatter.ofPattern("dd MMM", locale).format(dateTime)

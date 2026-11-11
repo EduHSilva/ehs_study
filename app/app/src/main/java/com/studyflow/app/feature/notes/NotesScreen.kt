@@ -57,7 +57,15 @@ import com.studyflow.app.ui.appViewModel
 fun NotesScreen() {
     val vm: NotesViewModel = appViewModel { NotesViewModel(it.notesRepository, it.settings) }
     val state by vm.state.collectAsStateWithLifecycle()
+    val requestedNoteId by NotesNavigation.requestedNoteId.collectAsStateWithLifecycle()
     val s = LocalStrings.current
+
+    LaunchedEffect(requestedNoteId, state.folders) {
+        val id = requestedNoteId ?: return@LaunchedEffect
+        if (state.folders.isEmpty()) return@LaunchedEffect
+        vm.openNote(id)
+        NotesNavigation.clear()
+    }
 
     var title by rememberSaveable { mutableStateOf("") }
     var content by rememberSaveable { mutableStateOf("") }

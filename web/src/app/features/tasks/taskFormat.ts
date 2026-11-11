@@ -39,6 +39,11 @@ const dayKeyOf = (value: string) => {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
+// Lista pronta para colar fora do app, no formato de checklist.
+export function formatTaskList(tasks: Array<{ title: string }>): string {
+  return tasks.map(task => `- [] ${task.title}`).join('\n')
+}
+
 // Rótulo do período ocupado pela task. Uma UNIQUE que ocupa um intervalo mostra
 // "05/10, 09:00 → 09/10, 18:00"; quando o início e o fim caem no mesmo dia, mostra só o dia.
 export function formatTaskPeriod(startDate: string | null, endDate: string | null): string {
