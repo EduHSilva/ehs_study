@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'; import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
-import { useStudentProfile } from '../features/auth/useAuth'
+import PageSkeleton from '../components/PageSkeleton.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
 import { useNotes } from '../features/notes/useNotes'
 
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t } = useI18n()
-const { student } = useStudentProfile()
 const { folders, folderNotes, selectedFolder, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, renameFolder } = useNotes()
 onMounted(load)
 
@@ -61,9 +60,10 @@ const beginRename = (folder: { id: string; name: string }) => { editingFolderId.
 const saveFolderName = async (id: string) => { if (await renameFolder(id, folderName.value)) editingFolderId.value = null }
 </script>
 <template>
-  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="notes" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('notesTitle') }}</h1><p>{{ t('notesSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
+  <section class="content"><header class="page-header"><div><h1>{{ t('notesTitle') }}</h1><p>{{ t('notesSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
-    <div class="notes-layout">
+    <PageSkeleton v-if="loading" layout="split" :label="t('notesLoading')" />
+    <div v-else class="notes-layout">
       <article class="card folder-card">
         <div class="card-title"><h2>{{ t('foldersTitle') }}</h2><button class="link" @click="addFolder">＋</button></div>
         <p v-if="!folders.length && !error" class="empty-note">{{ t('noFolders') }}</p>
@@ -93,8 +93,7 @@ const saveFolderName = async (id: string) => { if (await renameFolder(id, folder
         <p v-else class="empty-note folder-notes-empty">{{ t('selectNoteHint') }}</p>
       </article>
     </div>
-  </section></main>
-  <main v-else class="loading">{{ t('notesLoading') }}</main>
+  </section>
 </template>
 <style scoped>
 .folder-delete{margin-top:12px;padding:4px}

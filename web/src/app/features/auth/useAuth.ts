@@ -5,6 +5,7 @@ import {
   notifyUnauthorized,
   UNAUTHORIZED_EVENT
 } from '../../composables/httpClient'
+import { resetSessionCache } from '../../composables/useSessionCache'
 import { navigate } from '../../composables/useNavigation'
 import { login as loginRequest, loginWithGoogle as googleLoginRequest, me as meRequest, register as registerRequest, updateUserName } from './auth.api'
 import type { AuthSession, Credentials, RegisterInput } from './types'
@@ -65,7 +66,9 @@ async function login(email: string, password: string): Promise<boolean> {
   pending.value = true
   error.value = null
   try {
-    session.value = await loginRequest(credentials)
+    const nextSession = await loginRequest(credentials)
+    resetSessionCache()
+    session.value = nextSession
     persistSession(session.value)
     navigate('dashboard')
     return true
@@ -81,7 +84,9 @@ async function loginWithGoogle(idToken: string): Promise<boolean> {
   pending.value = true
   error.value = null
   try {
-    session.value = await googleLoginRequest(idToken)
+    const nextSession = await googleLoginRequest(idToken)
+    resetSessionCache()
+    session.value = nextSession
     persistSession(session.value)
     navigate('dashboard')
     return true

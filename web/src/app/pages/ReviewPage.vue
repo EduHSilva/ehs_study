@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'; import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
-import { useStudentProfile } from '../features/auth/useAuth'
+import PageSkeleton from '../components/PageSkeleton.vue'; import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
 import { useReview } from '../features/review/useReview'
 
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t } = useI18n()
-const { student } = useStudentProfile()
 const { report, loading, error, load } = useReview()
 onMounted(load)
 
@@ -19,8 +17,9 @@ const tab = ref('plagiarism')
 const referenceLabel = (status: 'Válida' | 'Atenção') => t(status === 'Válida' ? 'referenceValid' : 'referenceAttention')
 </script>
 <template>
-  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="review" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('reviewTitle') }}</h1><p>{{ t('reviewSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
+  <section class="content"><header class="page-header"><div><h1>{{ t('reviewTitle') }}</h1><p>{{ t('reviewSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
+    <PageSkeleton v-if="loading" layout="split" :label="t('reviewLoading')" />
     <div v-else-if="report" class="review-layout">
       <article class="card document-preview"><h2>{{ t('previewA4') }}</h2><div class="paper"><strong>{{report.documentTitle}}</strong><p>{{report.excerpt}}</p><mark>*{{report.flaggedExcerpt}}*</mark></div></article>
       <article class="card review-panel">
@@ -32,6 +31,5 @@ const referenceLabel = (status: 'Válida' | 'Atenção') => t(status === 'Válid
         <p v-for="item in report.references" :key="item.citation" class="reference">{{item.citation}} <span>{{ referenceLabel(item.status) }}</span></p>
       </article>
     </div>
-  </section></main>
-  <main v-else class="loading">{{ t('reviewLoading') }}</main>
+  </section>
 </template>

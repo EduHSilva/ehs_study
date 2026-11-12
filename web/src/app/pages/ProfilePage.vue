@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import LanguageToggle from '../components/LanguageToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
-import { useAuth, useStudentProfile } from '../features/auth/useAuth'
+import { useAuth } from '../features/auth/useAuth'
 import { useProfileUpdate } from '../features/auth/useAuth'
 
 defineEmits<{ navigate: [page: AppPage] }>()
 
 const { t } = useI18n()
-const { student } = useStudentProfile()
 const { user } = useAuth()
 const firstNameInitial = user.value?.name.charAt(0).toUpperCase() ?? '?'
 
@@ -21,9 +19,7 @@ const submit = () => { void updateProfile(name.value) }
 </script>
 
 <template>
-  <main class="app-shell">
-    <AppSidebar v-bind="student" active="profile" @navigate="$emit('navigate', $event)" />
-    <section class="content">
+  <section class="content">
       <header class="page-header">
         <div><h1>{{ t('profileTitle') }}</h1><p>{{ t('profileSubtitle') }}</p></div>
         <div class="header-actions"><LanguageToggle /><ThemeToggle /></div>
@@ -53,8 +49,7 @@ const submit = () => { void updateProfile(name.value) }
           <button class="button" type="submit" :disabled="pending">{{ pending ? t('profileSaving') : t('profileSave') }}</button>
         </form>
       </div>
-    </section>
-  </main>
+  </section>
 </template>
 
 <style scoped>

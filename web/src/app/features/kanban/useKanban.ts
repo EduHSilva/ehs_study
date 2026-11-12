@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { getProjects, updateProject } from '../projects/projects.api'
 import { dayKey, dayKeyFrom, isTaskDone } from '../tasks/calendar'
 import { getAllTasks, updateTask } from '../tasks/tasks.api'
@@ -24,6 +25,30 @@ export interface ProjectColumnView {
   items: Project[]
 }
 
+// Cache de módulo: o quadro carrega o acervo inteiro, então manter as listas evita refazer as
+// duas chamadas (e o skeleton) a cada troca de tela.
+const tasks = ref<Task[]>([])
+const projects = ref<Project[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+const tasksLoaded = ref(false)
+const projectsLoaded = ref(false)
+let loaded = false
+let inFlight: Promise<void> | null = null
+let cacheEpoch = 0
+
+onSessionCacheReset(() => {
+  cacheEpoch += 1
+  loaded = false
+  inFlight = null
+  tasks.value = []
+  projects.value = []
+  tasksLoaded.value = false
+  projectsLoaded.value = false
+  loading.value = true
+  error.value = null
+})
+
 // O Kanban carrega o acervo inteiro (sem recorte de período) e agrupa no cliente. A coluna da
 // tarefa prioriza a conclusão efetiva — numa DAILY isso depende do dia, não do `status` — e só
 // depois olha o atraso, o que mantém a mesma semântica da lista/calendário.
@@ -31,13 +56,7 @@ export function useKanban() {
   const { t } = useI18n()
 
   const entity = ref<KanbanEntity>('tasks')
-  const tasks = ref<Task[]>([])
-  const projects = ref<Project[]>([])
-  const loading = ref(true)
-  const error = ref<string | null>(null)
   const savingId = ref<string | null>(null)
-  const tasksLoaded = ref(false)
-  const projectsLoaded = ref(false)
   const todayKey = ref(dayKey(new Date()))
 
   // O atraso é derivado do prazo no backend: só faz sentido mover para DELAYED quando a tarefa
@@ -81,28 +100,39 @@ export function useKanban() {
     ]
   })
 
-  const load = async () => {
-    loading.value = true
+  const load = (): Promise<void> => {
+    if (inFlight) return inFlight
+    const epoch = cacheEpoch
+    loading.value = !loaded
     error.value = null
-    try {
-      // As duas listas são carregadas juntas para a troca de aba ser instantânea e para os cartões
-      // de tarefa mostrarem o nome do projeto. Uma falha não derruba a outra.
-      const [taskResult, projectResult] = await Promise.allSettled([getAllTasks(), getProjects()])
-      if (taskResult.status === 'fulfilled') {
-        tasks.value = taskResult.value
-        tasksLoaded.value = true
+    inFlight = (async () => {
+      try {
+        // As duas listas são carregadas juntas para a troca de aba ser instantânea e para os cartões
+        // de tarefa mostrarem o nome do projeto. Uma falha não derruba a outra.
+        const [taskResult, projectResult] = await Promise.allSettled([getAllTasks(), getProjects()])
+        if (epoch !== cacheEpoch) return
+        todayKey.value = dayKey(new Date())
+        if (taskResult.status === 'fulfilled') {
+          tasks.value = taskResult.value
+          tasksLoaded.value = true
+        }
+        if (projectResult.status === 'fulfilled') {
+          projects.value = projectResult.value
+          projectsLoaded.value = true
+        }
+        const currentFailed = entity.value === 'tasks'
+          ? taskResult.status === 'rejected'
+          : projectResult.status === 'rejected'
+        if (currentFailed) error.value = t('kanbanLoadFailed')
+        loaded = true
+      } finally {
+        if (epoch === cacheEpoch) {
+          loading.value = false
+          inFlight = null
+        }
       }
-      if (projectResult.status === 'fulfilled') {
-        projects.value = projectResult.value
-        projectsLoaded.value = true
-      }
-      const currentFailed = entity.value === 'tasks'
-        ? taskResult.status === 'rejected'
-        : projectResult.status === 'rejected'
-      if (currentFailed) error.value = t('kanbanLoadFailed')
-    } finally {
-      loading.value = false
-    }
+    })()
+    return inFlight
   }
 
   const setEntity = async (next: KanbanEntity) => {

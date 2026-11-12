@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'
+import PageSkeleton from '../components/PageSkeleton.vue'
 import LanguageToggle from '../components/LanguageToggle.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
-import { useStudentProfile } from '../features/auth/useAuth'
 import { useKanban } from '../features/kanban/useKanban'
 import type { ProjectColumn, TaskColumn } from '../features/kanban/useKanban'
 import { formatTaskPeriod } from '../features/tasks/taskFormat'
@@ -14,7 +13,6 @@ import type { Task } from '../features/tasks/types'
 
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t } = useI18n()
-const { student } = useStudentProfile()
 const {
   entity,
   projects,
@@ -76,9 +74,7 @@ const onProjectStatusChange = (id: string, event: Event) => {
 </script>
 
 <template>
-  <main v-if="!loading" class="app-shell">
-    <AppSidebar v-bind="student" active="kanban" @navigate="$emit('navigate', $event)" />
-    <section class="content">
+  <section class="content">
       <header class="page-header">
         <div>
           <h1>{{ t('kanban') }}</h1>
@@ -88,6 +84,8 @@ const onProjectStatusChange = (id: string, event: Event) => {
       </header>
 
       <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
+      <PageSkeleton v-if="loading" layout="board" :label="t('kanbanLoading')" />
+      <template v-else>
 
       <div class="mode-switch kanban-switch">
         <button :class="{ selected: entity === 'tasks' }" @click="setEntity('tasks')">{{ t('kanbanSwitchTasks') }}</button>
@@ -177,9 +175,8 @@ const onProjectStatusChange = (id: string, event: Event) => {
           </article>
         </article>
       </div>
-    </section>
-  </main>
-  <main v-else class="loading">{{ t('kanbanLoading') }}</main>
+      </template>
+  </section>
 </template>
 
 <style scoped>

@@ -1,3 +1,5 @@
+import { resetSessionCache } from './useSessionCache'
+
 export const AUTH_STORAGE_KEY = 'studyflow-auth'
 export const UNAUTHORIZED_EVENT = 'studyflow:unauthorized'
 
@@ -11,6 +13,7 @@ export function clearStoredSession() {
 
 export function notifyUnauthorized() {
   clearStoredSession()
+  resetSessionCache()
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT))
   }

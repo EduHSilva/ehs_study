@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { copyToClipboard } from '../../composables/useClipboard'
 import { useI18n } from '../../composables/useI18n'
+import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { getProjectDetails, getProjects } from '../projects/projects.api'
 import { createTask, deleteTask, getTasksInRange, updateTask } from './tasks.api'
 import { buildCalendarGrid, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
@@ -11,30 +12,53 @@ import type { Task, TaskInput, TaskStatus, TaskType } from './types'
 const TITLE_MIN_LENGTH = 1
 export const PAGE_SIZE = 10
 
+// Cache de módulo: período, dia selecionado, lista e calendário continuam na tela quando o
+// usuário sai e volta; a revalidação roda em segundo plano.
+const todayKey = ref(dayKey(new Date()))
+const anchor = ref(startOfDay(new Date()))
+const mode = ref<'week' | 'month'>('week')
+const periodTasks = ref<Task[]>([])
+const selectedDay = ref<string | null>(dayKey(new Date()))
+const items = ref<Task[]>([])
+const filteredTasks = ref<Task[]>([])
+const loading = ref(true)
+const page = ref(0)
+const total = ref(0)
+const error = ref<string | null>(null)
+const projectOptions = ref<Project[]>([])
+const stagesByProject = ref<Record<string, ProjectStage[]>>({})
+let loaded = false
+let inFlight: Promise<void> | null = null
+let cacheEpoch = 0
+
+onSessionCacheReset(() => {
+  cacheEpoch += 1
+  loaded = false
+  inFlight = null
+  todayKey.value = dayKey(new Date())
+  anchor.value = startOfDay(new Date())
+  mode.value = 'week'
+  periodTasks.value = []
+  selectedDay.value = todayKey.value
+  items.value = []
+  filteredTasks.value = []
+  page.value = 0
+  total.value = 0
+  projectOptions.value = []
+  stagesByProject.value = {}
+  loading.value = true
+  error.value = null
+})
+
 export function useTasks() {
   const { t } = useI18n()
 
   // Período e calendário navegável
-  const todayKey = ref(dayKey(new Date()))
-  const anchor = ref(startOfDay(new Date()))
-  const mode = ref<'week' | 'month'>('week')
   const calendarLoading = ref(false)
 
-  // Tarefas do período visível, usadas para pintar o calendário
-  const periodTasks = ref<Task[]>([])
-  // A tela abre com o dia de hoje selecionado: sem isso a lista mostra as tarefas do período
-  // visível — ou a janela padrão do back, que não é o dia atual.
-  const selectedDay = ref<string | null>(todayKey.value)
-
-  const items = ref<Task[]>([])
-  const filteredTasks = ref<Task[]>([])
-  const loading = ref(true)
   const pageLoading = ref(false)
-  const page = ref(0)
-  const total = ref(0)
   const savingId = ref<string | null>(null)
   const deletingId = ref<string | null>(null)
-  const error = ref<string | null>(null)
   const copied = ref(false)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -45,8 +69,6 @@ export function useTasks() {
   const type = ref<TaskType>('UNIQUE')
   const projectId = ref('')
   const stageId = ref('')
-  const projectOptions = ref<Project[]>([])
-  const stagesByProject = ref<Record<string, ProjectStage[]>>({})
   const creating = ref(false)
   const updating = ref(false)
   const editingId = ref<string | null>(null)
@@ -164,6 +186,7 @@ export function useTasks() {
 
   const refresh = async () => {
     pageLoading.value = true
+    calendarLoading.value = true
     error.value = null
     try {
       await fetchPeriod()
@@ -172,19 +195,33 @@ export function useTasks() {
       error.value = t('tasksLoadFailed')
     } finally {
       pageLoading.value = false
+      calendarLoading.value = false
     }
   }
 
-  const load = async () => {
-    loading.value = true
-    calendarLoading.value = true
-    try {
-      await loadProjectOptions()
-      await refresh()
-    } finally {
-      loading.value = false
-      calendarLoading.value = false
-    }
+  const load = (): Promise<void> => {
+    if (inFlight) return inFlight
+    const epoch = cacheEpoch
+    loading.value = !loaded
+    inFlight = (async () => {
+      try {
+        const previousToday = todayKey.value
+        todayKey.value = dayKey(new Date())
+        // Se o app ficou aberto e o dia virou, o dia selecionado acompanha "hoje".
+        if (selectedDay.value === previousToday) selectedDay.value = todayKey.value
+        // Projetos (para as opções do formulário) e tarefas do período não dependem entre si:
+        // buscar juntos evita a soma das duas esperas no primeiro carregamento.
+        await Promise.all([loadProjectOptions(), refresh()])
+        if (epoch !== cacheEpoch) return
+        loaded = true
+      } finally {
+        if (epoch === cacheEpoch) {
+          loading.value = false
+          inFlight = null
+        }
+      }
+    })()
+    return inFlight
   }
 
   const navigate = async (step: number) => {

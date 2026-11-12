@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { getDashboard } from './dashboard.api'
 import { updateTask } from '../tasks/tasks.api'
 import { dayKey, taskCoversDay } from '../tasks/calendar'
@@ -7,13 +8,29 @@ import { getTodaySessions } from '../pomodoro/pomodoro.api'
 import type { DashboardData } from './types'
 import type { FocusSession } from '../pomodoro/types'
 
+// Cache de módulo: voltar ao dashboard mostra o que já veio antes e revalida em segundo plano,
+// em vez de trocar a tela inteira por um "Carregando…".
+const data = ref<DashboardData | null>(null)
+const focus = ref<FocusSession | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
+let loaded = false
+let inFlight: Promise<void> | null = null
+let cacheEpoch = 0
+
+onSessionCacheReset(() => {
+  cacheEpoch += 1
+  loaded = false
+  inFlight = null
+  data.value = null
+  focus.value = null
+  loading.value = true
+  error.value = null
+})
+
 export function useDashboard() {
   const { t } = useI18n()
-  const data = ref<DashboardData | null>(null)
-  const focus = ref<FocusSession | null>(null)
-  const loading = ref(true)
   const savingTaskId = ref<string | null>(null)
-  const error = ref<string | null>(null)
 
   const progress = computed(() => {
     const { completed, total } = data.value?.weeklyProgress ?? { completed: 0, total: 0 }
@@ -30,21 +47,32 @@ export function useDashboard() {
 
   // O foco não vive mais no dashboard: o cronômetro roda no cliente e o que persiste são as
   // sessões de `/focus`. O card "Foco Ativo" mostra o último foco concluído hoje (se houver).
-  const load = async () => {
-    try {
-      loading.value = true
-      error.value = null
-      const [dashboard, sessions] = await Promise.all([
-        getDashboard(),
-        getTodaySessions().catch(() => [] as FocusSession[])
-      ])
-      data.value = dashboard
-      focus.value = sessions[0] ?? null
-    } catch {
-      error.value = t('dashboardLoadFailed')
-    } finally {
-      loading.value = false
-    }
+  const load = (): Promise<void> => {
+    if (inFlight) return inFlight
+    const epoch = cacheEpoch
+    loading.value = !loaded
+    error.value = null
+    inFlight = (async () => {
+      try {
+        const [dashboard, sessions] = await Promise.all([
+          getDashboard(),
+          getTodaySessions().catch(() => [] as FocusSession[])
+        ])
+        if (epoch !== cacheEpoch) return
+        data.value = dashboard
+        focus.value = sessions[0] ?? null
+        loaded = true
+      } catch {
+        if (epoch !== cacheEpoch) return
+        error.value = t('dashboardLoadFailed')
+      } finally {
+        if (epoch === cacheEpoch) {
+          loading.value = false
+          inFlight = null
+        }
+      }
+    })()
+    return inFlight
   }
 
   const toggleTask = async (id: string) => {
