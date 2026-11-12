@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'
+import PageSkeleton from '../components/PageSkeleton.vue'
 import LanguageToggle from '../components/LanguageToggle.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
-import { useStudentProfile } from '../features/auth/useAuth'
 import { useTasks } from '../features/tasks/useTasks'
 import { formatTaskPeriod } from '../features/tasks/taskFormat'
 import { parseDayKey } from '../features/tasks/calendar'
@@ -13,7 +12,6 @@ import type { Task } from '../features/tasks/types'
 
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
-const { student } = useStudentProfile()
 const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, copied, pendingCount, dailyCount, anchor, mode, calendar, selectedDay, formOpen, title, startDate, endDate, type, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, load, goToPage, navigate, jumpTo, setMode, toggle, copyTasks, remove, toggleForm, create, openEdit, submitForm } = useTasks()
 onMounted(load)
 
@@ -57,8 +55,10 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
 }
 </script>
 <template>
-  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="tasks" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('tasks') }}</h1><p>{{ t('tasksSubtitle') }}</p></div><div class="header-actions"><button class="button secondary" :disabled="!total" @click="copyTasks">{{ copied ? t('tasksCopied') : t('copyTasksAction') }}</button><LanguageToggle/><ThemeToggle/></div></header>
+  <section class="content"><header class="page-header"><div><h1>{{ t('tasks') }}</h1><p>{{ t('tasksSubtitle') }}</p></div><div class="header-actions"><button class="button secondary" :disabled="!total" @click="copyTasks">{{ copied ? t('tasksCopied') : t('copyTasksAction') }}</button><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
+    <PageSkeleton v-if="loading" layout="list" :label="t('tasksLoading')" />
+    <template v-else>
 
     <article class="card calendar-card" :aria-busy="calendarLoading">
       <div class="calendar-head">
@@ -116,6 +116,6 @@ const dailyStats = (item: { dailyCompletions: unknown[] }) => {
       <button class="button secondary" :disabled="!canGoNext" @click="goToPage(page + 1)">{{ t('nextPage') }}</button>
     </nav>
     <p class="task-summary">{{ t('taskPendingCount', { count: pendingCount, total }) }} · {{ t('taskDailyCount', { count: dailyCount }) }}</p>
-  </section></main>
-  <main v-else class="loading">{{ t('tasksLoading') }}</main>
+    </template>
+  </section>
 </template>

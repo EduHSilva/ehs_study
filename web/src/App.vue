@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
-import { useAuth } from './app/features/auth/useAuth'
+import { computed, watchEffect } from 'vue'
+import type { Component } from 'vue'
+import { useAuth, useStudentProfile } from './app/features/auth/useAuth'
 import { currentPage, navigate } from './app/composables/useNavigation'
+import type { AppPage } from './app/composables/useNavigation'
+import AppSidebar from './app/components/AppSidebar.vue'
 import LandingPage from './app/pages/LandingPage.vue'
 import DashboardPage from './app/pages/DashboardPage.vue'
 import PomodoroPage from './app/pages/PomodoroPage.vue'
@@ -12,8 +15,15 @@ import ProjectsPage from './app/pages/ProjectsPage.vue'
 import ReviewPage from './app/pages/ReviewPage.vue'
 import ProfilePage from './app/pages/ProfilePage.vue'
 import PomodoroWidget from './app/components/PomodoroWidget.vue'
+import { useDashboard } from './app/features/dashboard/useDashboard'
+import { useNotes } from './app/features/notes/useNotes'
+import { usePomodoro } from './app/features/pomodoro/usePomodoro'
+import { useTasks } from './app/features/tasks/useTasks'
+import { useKanban } from './app/features/kanban/useKanban'
+import { useProjects } from './app/features/projects/useProjects'
 
 const { isAuthenticated, initAuth } = useAuth()
+const { student } = useStudentProfile()
 void initAuth()
 
 const pageTitles: Record<string, string> = {
@@ -27,6 +37,37 @@ const pageTitles: Record<string, string> = {
   profile: 'Perfil'
 }
 
+// A sidebar vive aqui, fora da página, para continuar montada entre navegações: só o painel
+// de conteúdo troca (e anima). Sem isso o shell inteiro piscava a cada clique no menu.
+const pages: Record<AppPage, Component> = {
+  dashboard: DashboardPage,
+  pomodoro: PomodoroPage,
+  notes: NotesPage,
+  tasks: TasksPage,
+  kanban: KanbanPage,
+  projects: ProjectsPage,
+  review: ReviewPage,
+  profile: ProfilePage
+}
+const page = computed(() => pages[currentPage.value])
+
+// Prefetch sob intenção: passar o mouse (ou focar pelo teclado) no item do menu já busca os
+// dados da tela, então o clique abre o conteúdo em vez de um skeleton.
+const prefetchers: Partial<Record<AppPage, () => void>> = {
+  dashboard: () => void useDashboard().load(),
+  pomodoro: () => void usePomodoro().load(),
+  notes: () => void useNotes().load(),
+  tasks: () => void useTasks().load(),
+  kanban: () => void useKanban().load(),
+  projects: () => void useProjects().load()
+}
+const prefetched = new Set<AppPage>()
+const prefetchPage = (target: AppPage) => {
+  if (prefetched.has(target)) return
+  prefetched.add(target)
+  prefetchers[target]?.()
+}
+
 watchEffect(() => {
   if (typeof document === 'undefined') return
 
@@ -38,15 +79,9 @@ watchEffect(() => {
 
 <template>
   <LandingPage v-if="!isAuthenticated" />
-  <template v-else>
-    <DashboardPage v-if="currentPage === 'dashboard'" @navigate="navigate" />
-    <PomodoroPage v-else-if="currentPage === 'pomodoro'" @navigate="navigate" />
-    <NotesPage v-else-if="currentPage === 'notes'" @navigate="navigate" />
-    <TasksPage v-else-if="currentPage === 'tasks'" @navigate="navigate" />
-    <KanbanPage v-else-if="currentPage === 'kanban'" @navigate="navigate" />
-    <ProjectsPage v-else-if="currentPage === 'projects'" @navigate="navigate" />
-    <ReviewPage v-else-if="currentPage === 'review'" @navigate="navigate" />
-    <ProfilePage v-else @navigate="navigate" />
+  <main v-else class="app-shell">
+    <AppSidebar v-bind="student" :active="currentPage" @navigate="navigate" @prefetch="prefetchPage" />
+    <component :is="page" :key="currentPage" @navigate="navigate" />
     <PomodoroWidget />
-  </template>
+  </main>
 </template>

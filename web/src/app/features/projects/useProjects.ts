@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { createProject as createProjectRequest, createStage as createStageRequest, createVersion as createVersionRequest, deleteProject as deleteProjectRequest, getProjectDetails, getProjects, updateProject as updateProjectRequest, updateStage, updateVersion as updateVersionRequest } from './projects.api'
 import { getTasksForProject } from '../tasks/tasks.api'
 import { isTaskDone } from '../tasks/calendar'
@@ -17,21 +18,43 @@ const sortProjects = (list: Project[]): Project[] =>
     return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
   })
 
+// Cache de módulo: a lista, o projeto selecionado e as tarefas continuam disponíveis quando o
+// usuário volta para a tela; a revalidação acontece em segundo plano.
+const projects = ref<Project[]>([])
+const details = ref<ProjectDetails | null>(null)
+const selectedId = ref<string | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
+const projectTasks = ref<Task[]>([])
+const tasksLoading = ref(false)
+const tasksError = ref<string | null>(null)
+let loaded = false
+let inFlight: Promise<void> | null = null
+let cacheEpoch = 0
+let selectToken = 0
+
+onSessionCacheReset(() => {
+  cacheEpoch += 1
+  loaded = false
+  inFlight = null
+  selectToken += 1
+  projects.value = []
+  details.value = null
+  selectedId.value = null
+  projectTasks.value = []
+  tasksLoading.value = false
+  tasksError.value = null
+  loading.value = true
+  error.value = null
+})
+
 export function useProjects() {
   const { t } = useI18n()
-  const projects = ref<Project[]>([])
-  const details = ref<ProjectDetails | null>(null)
-  const selectedId = ref<string | null>(null)
-  const loading = ref(true)
   const savingStageId = ref<string | null>(null)
   const savingVersionId = ref<string | null>(null)
   const savingNewStage = ref(false)
   const savingNewVersion = ref(false)
   const savingProject = ref(false)
-  const error = ref<string | null>(null)
-  const projectTasks = ref<Task[]>([])
-  const tasksLoading = ref(false)
-  const tasksError = ref<string | null>(null)
 
   const tasksByStage = computed(() => {
     const map = new Map<string, Task[]>()
@@ -60,30 +83,69 @@ export function useProjects() {
     }
   }
 
-  const load = async () => {
-    try {
-      loading.value = true
-      error.value = null
-      projects.value = sortProjects(await getProjects())
-      if (projects.value[0]) await selectProject(projects.value[0].id)
-    } catch {
-      error.value = t('projectsLoadFailed')
-    } finally {
-      loading.value = false
-    }
+  const load = (): Promise<void> => {
+    if (inFlight) return inFlight
+    const epoch = cacheEpoch
+    loading.value = !loaded
+    error.value = null
+    inFlight = (async () => {
+      try {
+        const list = sortProjects(await getProjects())
+        if (epoch !== cacheEpoch) return
+        projects.value = list
+        // Mantém o projeto aberto na visita anterior; se ele sumiu, abre o primeiro.
+        const target = list.find(project => project.id === selectedId.value) ?? list[0] ?? null
+        if (target) {
+          await selectProject(target.id)
+        } else {
+          details.value = null
+          selectedId.value = null
+          projectTasks.value = []
+        }
+        loaded = true
+      } catch {
+        if (epoch !== cacheEpoch) return
+        error.value = t('projectsLoadFailed')
+      } finally {
+        if (epoch === cacheEpoch) {
+          loading.value = false
+          inFlight = null
+        }
+      }
+    })()
+    return inFlight
   }
 
   const selectProject = async (id: string) => {
+    const token = ++selectToken
+    const changed = id !== selectedId.value
     selectedId.value = id
-    projectTasks.value = []
-    tasksError.value = null
-    try {
-      details.value = await getProjectDetails(id)
-    } catch {
-      error.value = t('projectDetailsLoadFailed')
-      return
+    // Trocar de projeto limpa o painel; revalidar o mesmo projeto mantém o conteúdo na tela e
+    // não exibe de novo o aviso de carregamento das tarefas.
+    const silent = !changed && details.value !== null
+    if (changed) {
+      details.value = null
+      projectTasks.value = []
     }
-    await loadTasks(id)
+    error.value = null
+    tasksError.value = null
+    tasksLoading.value = !silent
+    // Detalhe e tarefas são independentes: buscar os dois juntos evita a espera em série, que
+    // era o principal motivo do painel demorar a ficar "completo".
+    const [detailsResult, tasksResult] = await Promise.allSettled([getProjectDetails(id), getTasksForProject(id)])
+    if (token !== selectToken) return
+    if (detailsResult.status === 'fulfilled') {
+      details.value = detailsResult.value
+    } else {
+      error.value = t('projectDetailsLoadFailed')
+    }
+    if (tasksResult.status === 'fulfilled') {
+      projectTasks.value = tasksResult.value
+    } else {
+      projectTasks.value = []
+      tasksError.value = t('projectTasksLoadFailed')
+    }
+    tasksLoading.value = false
   }
 
   const syncProgress = () => {

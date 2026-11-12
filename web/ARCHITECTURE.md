@@ -25,3 +25,19 @@ Regras de manutenção:
 - Regras de formulário, transformação de payload e estados de carregamento ficam no composable da feature.
 - Acesso a `localStorage` fica em `*.repository.ts`, nunca em páginas.
 - Tipos são declarados no domínio que os possui e só vão para `app/types` quando forem realmente transversais.
+
+## Shell e carregamento (SPA)
+
+- `src/App.vue` é o shell autenticado: mantém sidebar, widget do Pomodoro e troca só a página
+  (`<component :is>`). As páginas renderizam apenas `<section class="content">`; não montam
+  sidebar nem `<main class="app-shell">`.
+- Primeiro carregamento usa `components/PageSkeleton.vue` (com `layout` por tipo de tela), nunca
+  um texto centralizado de "Carregando…". O cabeçalho da página continua visível.
+- O estado das features fica em refs de módulo com o par `loaded`/`inFlight`: ao revisitar uma
+  tela o conteúdo anterior aparece na hora e `load()` revalida em silêncio; o skeleton só
+  aparece antes do primeiro sucesso. Operações em andamento são coalescidas por `inFlight`.
+- `composables/useSessionCache.ts` limpa esses caches no logout/401 (`notifyUnauthorized`) e no
+  login, para não exibir dados do usuário anterior.
+- O hover/focus no item do menu dispara `load()` da página (prefetch sob intenção); ao clicar,
+  o conteúdo tende a já estar pronto.
+

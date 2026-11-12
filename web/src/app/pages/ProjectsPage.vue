@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'; import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
-import { useStudentProfile } from '../features/auth/useAuth'
+import PageSkeleton from '../components/PageSkeleton.vue'; import ThemeToggle from '../components/ThemeToggle.vue'; import LanguageToggle from '../components/LanguageToggle.vue'; import { useI18n } from '../composables/useI18n'; import type { AppPage } from '../composables/useNavigation'
 import { useProjects } from '../features/projects/useProjects'
 import type { ProjectStatus } from '../features/projects/types'
 
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t, locale } = useI18n()
-const { student } = useStudentProfile()
 const { projects, details, selectedId, loading, savingStageId, savingVersionId, savingNewStage, savingNewVersion, savingProject, error, tasksLoading, tasksError, projectTasks, stageTasks, unassignedTasks, isTaskDone, load, selectProject, createProject, saveProject, toggleProjectStatus, removeProject, createStage, createVersion, toggleStage, updateVersion } = useProjects()
 onMounted(load)
 
@@ -140,9 +138,10 @@ const saveVersion = async (id: string) => {
 }
 </script>
 <template>
-  <main v-if="!loading" class="app-shell"><AppSidebar v-bind="student" active="projects" @navigate="$emit('navigate',$event)"/><section class="content"><header class="page-header"><div><h1>{{ t('projectsTitle') }}</h1><p>{{ t('projectsSubtitle') }}</p><p>{{ t('projectsHint') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
+  <section class="content"><header class="page-header"><div><h1>{{ t('projectsTitle') }}</h1><p>{{ t('projectsSubtitle') }}</p><p>{{ t('projectsHint') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
-    <div class="projects-layout">
+    <PageSkeleton v-if="loading" layout="split" :label="t('projectsLoading')" />
+    <div v-else class="projects-layout">
       <article class="card project-list">
         <div class="card-title"><h2>{{ t('myProjects') }}</h2><button v-if="!creatingProject" class="button" @click="creatingProject=true">＋ {{ t('newProject') }}</button></div>
         <form v-if="creatingProject" class="project-create-form" @submit.prevent="submitProject">
@@ -216,11 +215,17 @@ const saveVersion = async (id: string) => {
         <form class="project-item-create version-create" @submit.prevent="submitVersion"><input v-model="newVersionTitle" :placeholder="t('versionTitlePlaceholder')" :aria-label="t('versionTitleLabel')" required maxlength="200"/><input v-model="newVersionDueDate" type="datetime-local" :aria-label="t('versionDueDateLabel')" required/><button class="button" type="submit" :disabled="savingNewVersion">{{ savingNewVersion ? t('saving') : t('addVersion') }}</button></form>
       </article>
       <article v-else-if="!error && projects.length" class="card project-details">
-        <p class="empty-note">{{ t('selectProjectPlaceholder') }}</p>
+        <template v-if="selectedId">
+          <span class="sr-only">{{ t('projectsLoading') }}</span>
+          <span class="skeleton skeleton-title short" />
+          <span class="skeleton skeleton-line wide" />
+          <span class="skeleton skeleton-line medium" />
+          <span class="skeleton skeleton-block" />
+        </template>
+        <p v-else class="empty-note">{{ t('selectProjectPlaceholder') }}</p>
       </article>
     </div>
-  </section></main>
-  <main v-else class="loading">{{ t('projectsLoading') }}</main>
+  </section>
 </template>
 <style scoped>
 .project-create-form{display:grid;gap:12px;padding:12px 0}

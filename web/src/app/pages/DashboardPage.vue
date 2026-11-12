@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import AppSidebar from '../components/AppSidebar.vue'
+import PageSkeleton from '../components/PageSkeleton.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import LanguageToggle from '../components/LanguageToggle.vue'
 import { useI18n } from '../composables/useI18n'
@@ -40,11 +40,11 @@ const focusTime = computed(() => {
 </script>
 
 <template>
-  <main v-if="data" class="app-shell">
-    <AppSidebar v-bind="student" active="dashboard" @navigate="$emit('navigate', $event)" />
-    <section class="content"><header class="page-header"><div><h1>{{ t('greeting', { name: firstName }) }}</h1><p>{{ t('dashboardWelcome') }}</p></div><div class="header-actions"><LanguageToggle /><ThemeToggle /></div></header>
-      <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
-      <div class="dashboard-grid">
+  <section class="content">
+    <header class="page-header"><div><h1>{{ t('greeting', { name: firstName }) }}</h1><p>{{ t('dashboardWelcome') }}</p></div><div class="header-actions"><LanguageToggle /><ThemeToggle /></div></header>
+    <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
+    <PageSkeleton v-if="loading" layout="dashboard" :label="t('dashboardLoading')" />
+    <div v-else-if="data" class="dashboard-grid">
         <div class="left-column">
           <article class="card progress-card"><h2>{{ t('weeklyProgressTitle') }}</h2><div class="progress-content"><div class="progress-ring" :style="{ '--progress': `${progress * 3.6}deg` }"><strong>{{ progress }}%</strong></div><div><p>{{ t('weeklyProgressBefore') }} <b>{{ data.weeklyProgress.completed }} {{ t('of') }} {{ data.weeklyProgress.total }}</b> {{ t('weeklyProgressAfter') }}</p><small>{{ t('weeklyProgressCheer') }}</small></div></div></article>
           <article class="card focus-card"><div class="card-title"><h2>{{ t('focusTitle') }}</h2><span v-if="timerActive" class="tag daily">{{ t('timerActiveTag') }}</span><span v-else class="tag">{{ t('focusTag') }}</span></div>
@@ -61,9 +61,8 @@ const focusTime = computed(() => {
           <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-grid"><button v-for="note in data.notes" :key="note.id" type="button" class="note" @click="openNote(note.id)"><strong>{{ note.title }}</strong><small>{{ note.content }}</small></button></div></article>
         </div>
       </div>
-    </section>
-  </main>
-  <main v-else class="loading">{{ loading ? t('dashboardLoading') : t('dashboardError') }}</main>
+    <p v-else class="empty-note">{{ t('dashboardError') }}</p>
+  </section>
 </template>
 
 <style scoped>

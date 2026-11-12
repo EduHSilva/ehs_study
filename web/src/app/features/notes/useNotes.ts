@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { createFolder, createNote as createNoteRequest, deleteFolder, deleteNote, getFolders, renameFolder as renameFolderRequest, saveNote } from './notes.api'
 import type { NoteFolder } from './types'
 
@@ -11,37 +12,77 @@ export const requestOpenNote = (id: string) => {
   requestedNoteId.value = id
 }
 
+// Cache de módulo: pastas e seleção sobrevivem à troca de tela; ao voltar, a tela aparece na
+// hora e a lista é revalidada em segundo plano.
+const folders = ref<NoteFolder[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+const selectedFolderId = ref<string | null>(null)
+const selectedNoteId = ref<string | null>(null)
+let loaded = false
+let inFlight: Promise<void> | null = null
+let cacheEpoch = 0
+
+onSessionCacheReset(() => {
+  cacheEpoch += 1
+  loaded = false
+  inFlight = null
+  requestedNoteId.value = null
+  folders.value = []
+  selectedFolderId.value = null
+  selectedNoteId.value = null
+  loading.value = true
+  error.value = null
+})
+
 export function useNotes() {
   const { t } = useI18n()
-  const folders = ref<NoteFolder[]>([])
-  const loading = ref(true)
   const saving = ref(false)
-  const error = ref<string | null>(null)
-  const selectedFolderId = ref<string | null>(null)
-  const selectedNoteId = ref<string | null>(null)
 
   const selectedFolder = computed(() => folders.value.find(folder => folder.id === selectedFolderId.value) ?? null)
   const folderNotes = computed(() => selectedFolder.value?.notes ?? [])
   const selectedNote = computed(() => folderNotes.value.find(note => note.id === selectedNoteId.value) ?? null)
 
-  const load = async () => {
+  const load = (): Promise<void> => {
+    // Prefetch disparado pelo hover pode estar em andamento quando a tela pede uma nota
+    // específica; nesse caso espera a busca atual e roda de novo já com o pedido.
+    if (inFlight) return inFlight.then(() => (requestedNoteId.value ? load() : undefined))
+    const epoch = cacheEpoch
     const requested = requestedNoteId.value
     requestedNoteId.value = null
-    try {
-      loading.value = true
-      error.value = null
-      folders.value = await getFolders()
-      const requestedFolder = requested
-        ? folders.value.find(folder => folder.notes.some(note => note.id === requested)) ?? null
-        : null
-      const firstFolder = requestedFolder ?? folders.value[0] ?? null
-      selectedFolderId.value = firstFolder?.id ?? null
-      selectedNoteId.value = requestedFolder ? requested : firstFolder?.notes[0]?.id ?? null
-    } catch {
-      error.value = t('notesLoadFailed')
-    } finally {
-      loading.value = false
-    }
+    loading.value = !loaded
+    error.value = null
+    inFlight = (async () => {
+      try {
+        const nextFolders = await getFolders()
+        if (epoch !== cacheEpoch) return
+        folders.value = nextFolders
+        const requestedFolder = requested
+          ? nextFolders.find(folder => folder.notes.some(note => note.id === requested)) ?? null
+          : null
+        if (requestedFolder) {
+          selectedFolderId.value = requestedFolder.id
+          selectedNoteId.value = requested
+        } else if (!nextFolders.some(folder => folder.id === selectedFolderId.value)) {
+          // Sem seleção válida (primeira visita ou pasta removida), abre a primeira pasta.
+          const firstFolder = nextFolders[0] ?? null
+          selectedFolderId.value = firstFolder?.id ?? null
+          selectedNoteId.value = firstFolder?.notes[0]?.id ?? null
+        } else if (!folderNotes.value.some(note => note.id === selectedNoteId.value)) {
+          selectedNoteId.value = folderNotes.value[0]?.id ?? null
+        }
+        loaded = true
+      } catch {
+        if (epoch !== cacheEpoch) return
+        error.value = t('notesLoadFailed')
+      } finally {
+        if (epoch === cacheEpoch) {
+          loading.value = false
+          inFlight = null
+        }
+      }
+    })()
+    return inFlight
   }
 
   const selectFolder = (id: string) => {
