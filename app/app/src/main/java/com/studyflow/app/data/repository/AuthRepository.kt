@@ -12,6 +12,8 @@ import com.studyflow.app.data.remote.RegisterRequest
 import com.studyflow.app.data.remote.UpdateUserRequest
 import kotlinx.coroutines.CancellationException
 
+private const val APP_SCOPE = "STUDY"
+
 class AuthRepository(
     private val api: AuthApi,
     private val sessionManager: SessionManager,
@@ -19,11 +21,15 @@ class AuthRepository(
     val session = sessionManager.session
 
     suspend fun login(email: String, password: String): AuthSession =
-        saveSession(api.login(LoginRequest(email = email.trim(), password = password)).unwrap())
+        saveSession(
+            api.login(
+                LoginRequest(email = email.trim(), password = password, app = APP_SCOPE),
+            ).unwrap(),
+        )
 
     /** Mesmo endpoint; o back aceita `tokenGmail` no lugar de e-mail/senha. */
     suspend fun loginWithGoogle(idToken: String): AuthSession =
-        saveSession(api.login(LoginRequest(tokenGmail = idToken)).unwrap())
+        saveSession(api.login(LoginRequest(tokenGmail = idToken, app = APP_SCOPE)).unwrap())
 
     suspend fun register(email: String, username: String, password: String) {
         api.register(

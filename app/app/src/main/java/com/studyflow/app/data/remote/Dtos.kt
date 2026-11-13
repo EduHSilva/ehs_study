@@ -12,6 +12,7 @@ data class LoginRequest(
     val email: String? = null,
     val password: String? = null,
     val tokenGmail: String? = null,
+    val app: String,
 )
 
 @Serializable

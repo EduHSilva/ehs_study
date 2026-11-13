@@ -74,6 +74,7 @@ const goLogin = () => {
             </button>
           </div>
         </label>
+        <p class="forgot-link"><a href="/user/reset-password">{{ t('forgotPassword') }}</a></p>
         <p v-if="error" class="form-error">{{ error }}</p>
         <button class="button" type="submit" :disabled="pending">{{ pending ? t('loggingIn') : t('loginAction') }}</button>
         <template v-if="googleEnabled || googleFailed">
@@ -113,6 +114,10 @@ const goLogin = () => {
         <button class="link-btn" type="button" @click="switchMode('login')">{{ t('alreadyHaveAccount') }} <em>{{ t('goToLogin') }}</em></button>
       </form>
     </main>
+    <footer class="landing-footer">
+      <span>EHS Study © {{ new Date().getFullYear() }}</span>
+      <a href="/app/privacidade/">{{ t('privacyPolicy') }}</a>
+    </footer>
   </div>
 </template>
 
@@ -124,4 +129,8 @@ const goLogin = () => {
 .or-divider{display:flex;align-items:center;gap:12px;color:var(--color-subtle);font-size:12px}
 .or-divider:before,.or-divider:after{content:'';flex:1;height:1px;background:var(--color-border)}
 .form-hint{margin:0;font-size:12px;color:var(--color-subtle);text-align:center}
+.forgot-link{margin:-4px 0 0;text-align:right;font-size:12px}
+.forgot-link a{color:var(--color-primary);font-weight:600}
+.landing-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px 26px;font-size:12px;color:var(--color-muted);border-top:1px solid var(--color-border)}
+.landing-footer a{color:var(--color-primary);font-weight:600}
 </style>
