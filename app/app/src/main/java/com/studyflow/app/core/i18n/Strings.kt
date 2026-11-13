@@ -290,6 +290,7 @@ private val ptBr: Map<String, String> = mapOf(
     "needAccount" to "Ainda não tem conta?",
     "goToLogin" to "Fazer login",
     "goToRegister" to "Criar conta",
+    "forgotPassword" to "Esqueci minha senha",
 
     "profileTitle" to "Meu Perfil",
     "profileSubtitle" to "Gerencie seus dados de acesso.",
@@ -301,6 +302,7 @@ private val ptBr: Map<String, String> = mapOf(
     "profileSaving" to "Salvando…",
     "profileSaveSuccess" to "Perfil atualizado!",
     "profileSaveFailed" to "Não foi possível salvar o perfil.",
+    "privacyPolicy" to "Política de Privacidade",
 
     "dashboardLoadFailed" to "Não foi possível sincronizar seus dados.",
     "taskSaveFailed" to "Não foi possível salvar a tarefa.",
@@ -617,6 +619,7 @@ private val en: Map<String, String> = mapOf(
     "needAccount" to "No account yet?",
     "goToLogin" to "Sign in",
     "goToRegister" to "Create account",
+    "forgotPassword" to "Forgot my password",
 
     "profileTitle" to "My Profile",
     "profileSubtitle" to "Manage your account details.",
@@ -628,6 +631,7 @@ private val en: Map<String, String> = mapOf(
     "profileSaving" to "Saving…",
     "profileSaveSuccess" to "Profile updated!",
     "profileSaveFailed" to "Could not save the profile.",
+    "privacyPolicy" to "Privacy Policy",
 
     "dashboardLoadFailed" to "Could not sync your data.",
     "taskSaveFailed" to "Could not save the task.",

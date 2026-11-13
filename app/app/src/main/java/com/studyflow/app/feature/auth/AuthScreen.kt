@@ -55,6 +55,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.studyflow.app.core.i18n.LocalStrings
+import com.studyflow.app.core.links.openExternal
+import com.studyflow.app.core.links.resetPasswordUrl
 import com.studyflow.app.core.ui.components.ContentCard
 import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.SettingsActions
@@ -80,7 +82,8 @@ fun AuthScreen() {
 
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
-    val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
+    val activity = context as? Activity
 
     val submit = {
         focusManager.clearFocus()
@@ -231,6 +234,15 @@ fun AuthScreen() {
                         keyboardActions = KeyboardActions(onDone = { submit() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
+
+                    if (mode == AuthMode.LOGIN) {
+                        TextButton(
+                            onClick = { openExternal(context, resetPasswordUrl) },
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Text(s["forgotPassword"], style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
 
                     val errorKey = if (mode == AuthMode.LOGIN) state.errorKey else state.registerErrorKey
                     if (errorKey != null) {

@@ -43,7 +43,7 @@ async function body<T>(res: APIResponse): Promise<T> {
 
 export async function login(request: APIRequestContext): Promise<string> {
   const res = await request.post(`${API_BASE_URL}/users/auth/login`, {
-    data: { email: E2E_EMAIL, password: E2E_PASSWORD }
+    data: { email: E2E_EMAIL, password: E2E_PASSWORD, app: 'STUDY' }
   })
   const session = await body<{ token: string | null }>(res)
   if (!session.token) throw new Error('Login real não retornou token')

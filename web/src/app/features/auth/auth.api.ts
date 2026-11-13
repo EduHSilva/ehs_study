@@ -21,7 +21,7 @@ function toSession(res: DefaultResponse<LoginPayload>): AuthSession {
 export async function login(credentials: { email: string; password: string }): Promise<AuthSession> {
   const res = await httpClient<DefaultResponse<LoginPayload>>('/users/auth/login', {
     method: 'POST',
-    body: JSON.stringify(credentials)
+    body: JSON.stringify({ ...credentials, app: 'STUDY' })
   })
   return toSession(res)
 }
@@ -31,7 +31,7 @@ export async function login(credentials: { email: string; password: string }): P
 export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
   const res = await httpClient<DefaultResponse<LoginPayload>>('/users/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ tokenGmail: idToken })
+    body: JSON.stringify({ tokenGmail: idToken, app: 'STUDY' })
   })
   return toSession(res)
 }
