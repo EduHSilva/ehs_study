@@ -21,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -99,7 +98,7 @@ private val drawerDestinations = listOf(
     Destination(Routes.TASKS, Icons.Filled.Checklist, "tasks"),
     Destination(Routes.KANBAN, Icons.Filled.ViewKanban, "kanban"),
     Destination(Routes.PROJECTS, Icons.Filled.School, "projects"),
-    Destination(Routes.REVIEW, Icons.Filled.FindInPage, "review"),
+    // Revisão ABNT ainda não tem endpoint no serviço study (ver TODO); oculto até existir.
     Destination(Routes.PROFILE, Icons.Filled.Person, "profile"),
 )
 
