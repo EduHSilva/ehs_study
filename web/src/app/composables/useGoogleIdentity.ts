@@ -1,4 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
+import { useTheme } from './useTheme'
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client'
 
@@ -58,27 +59,39 @@ export function useGoogleIdentity(container: Ref<HTMLElement | null>, onCredenti
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
   const enabled = clientId.length > 0
   const failed = ref(false)
+  const { theme } = useTheme()
+
+  let renderedTheme = ''
+  let renderedWidth = 0
 
   const render = async (el: HTMLElement) => {
-    if (!enabled || el.childElementCount > 0) return
+    if (!enabled) return
     try {
       const google = await loadGoogleIdentity()
       // A tela pode ter desmontado enquanto o script carregava.
       if (container.value !== el) return
+      // O GSI nao aceita largura percentual e o tema e fixado no desenho do botao,
+      // entao cada mudanca de largura ou de tema exige um novo render.
+      const mode = theme.value === 'dark' ? 'filled_black' : 'outline'
+      const width = Math.max(200, Math.min(400, Math.floor(el.getBoundingClientRect().width) || 300))
+      if (mode === renderedTheme && width === renderedWidth) return
+      renderedTheme = mode
+      renderedWidth = width
       google.accounts.id.initialize({
         client_id: clientId,
         callback: (response) => {
           if (response.credential) onCredential(response.credential)
         }
       })
+      el.replaceChildren()
       google.accounts.id.renderButton(el, {
         type: 'standard',
-        theme: 'outline',
+        theme: mode,
         size: 'large',
         text: 'continue_with',
         shape: 'rectangular',
         logo_alignment: 'left',
-        width: Math.max(240, Math.floor(el.getBoundingClientRect().width) || 280)
+        width
       })
     } catch {
       failed.value = true
@@ -88,6 +101,7 @@ export function useGoogleIdentity(container: Ref<HTMLElement | null>, onCredenti
   // `flush: 'post'` garante que o elemento ja esteja no documento quando o Google tentar
   // medir a largura do botao.
   watch(container, (el) => { if (el) void render(el) }, { flush: 'post' })
+  watch(theme, () => { if (container.value) void render(container.value) })
 
   return { enabled, failed, clientId }
 }
