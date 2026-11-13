@@ -58,7 +58,7 @@ class PomodoroWidgetViewModel(
         viewModelScope.launch {
             try {
                 focusRepository.createSession(settings.strings()["focusSessionTitle"], current.elapsedMinutes)
-                timer.reset()
+                timer.advanceAfterFocus()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -85,12 +85,20 @@ fun PomodoroWidget(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val colors = StudyFlowTheme.colors
     val borderColor = when {
         timer.completed -> colors.success
-        timer.mode == TimerMode.BREAK -> MaterialTheme.colorScheme.primary
+        timer.mode != TimerMode.FOCUS -> MaterialTheme.colorScheme.primary
         else -> colors.border
     }
-    val modeLabel = s[if (timer.mode == TimerMode.FOCUS) "focusModeShort" else "breakModeShort"]
+    val modeLabel = s[when (timer.mode) {
+        TimerMode.FOCUS -> "focusModeShort"
+        TimerMode.BREAK -> "breakModeShort"
+        TimerMode.LONG_BREAK -> "longBreakModeShort"
+    }]
     val stateLabel = when {
-        timer.completed -> s[if (timer.mode == TimerMode.FOCUS) "focusComplete" else "breakComplete"]
+        timer.completed -> s[when (timer.mode) {
+            TimerMode.FOCUS -> "focusComplete"
+            TimerMode.BREAK -> "breakComplete"
+            TimerMode.LONG_BREAK -> "longBreakComplete"
+        }]
         timer.running -> s["timerRunning"]
         else -> s["timerPaused"]
     }

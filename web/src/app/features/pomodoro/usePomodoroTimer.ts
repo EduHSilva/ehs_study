@@ -1,10 +1,21 @@
 import { computed, ref } from 'vue'
 import { playChime, primeAudio } from './pomodoroSound'
 
-export const FOCUS_SECONDS = 25 * 60
-export const BREAK_SECONDS = 5 * 60
+export type TimerMode = 'focus' | 'break' | 'longBreak'
 
-export type TimerMode = 'focus' | 'break'
+export interface PomodoroSettings {
+  focusMinutes: number
+  breakMinutes: number
+  longBreakMinutes: number
+  cycles: number
+}
+
+export const DEFAULT_SETTINGS: PomodoroSettings = {
+  focusMinutes: 25,
+  breakMinutes: 5,
+  longBreakMinutes: 15,
+  cycles: 4
+}
 
 interface StoredTimer {
   mode: TimerMode
@@ -13,18 +24,31 @@ interface StoredTimer {
   remaining: number
   started: boolean
   completed: boolean
+  focusCount: number
 }
 
 const STORAGE_KEY = 'studyflow-pomodoro'
+const SETTINGS_KEY = 'studyflow-pomodoro-settings'
 
-const durationFor = (mode: TimerMode) => (mode === 'focus' ? FOCUS_SECONDS : BREAK_SECONDS)
+const settings = ref<PomodoroSettings>({ ...DEFAULT_SETTINGS })
+
+const clamp = (value: number, min: number, max: number, fallback: number) =>
+  Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback
+
+const durationFor = (value: TimerMode) => {
+  const minutes = value === 'focus'
+    ? settings.value.focusMinutes
+    : value === 'longBreak' ? settings.value.longBreakMinutes : settings.value.breakMinutes
+  return minutes * 60
+}
 
 const mode = ref<TimerMode>('focus')
 const running = ref(false)
 const endsAt = ref<number | null>(null)
-const remaining = ref(FOCUS_SECONDS)
+const remaining = ref(durationFor('focus'))
 const started = ref(false)
 const completed = ref(false)
+const focusCount = ref(0)
 let ticker: number | undefined
 
 const snapshot = (): StoredTimer => ({
@@ -33,7 +57,8 @@ const snapshot = (): StoredTimer => ({
   endsAt: endsAt.value,
   remaining: remaining.value,
   started: started.value,
-  completed: completed.value
+  completed: completed.value,
+  focusCount: focusCount.value
 })
 
 function persist(): void {
@@ -41,6 +66,31 @@ function persist(): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot()))
   } catch {
     // Armazenamento indisponível (modo privado): o cronômetro segue funcionando só na memória.
+  }
+}
+
+function persistSettings(): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings.value))
+  } catch {
+    // Idem: sem localStorage os ajustes valem só para esta sessão.
+  }
+}
+
+function restoreSettings(): void {
+  let stored: unknown
+  try {
+    stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null')
+  } catch {
+    return
+  }
+  if (!stored || typeof stored !== 'object') return
+  const data = stored as Partial<PomodoroSettings>
+  settings.value = {
+    focusMinutes: clamp(Number(data.focusMinutes), 1, 180, DEFAULT_SETTINGS.focusMinutes),
+    breakMinutes: clamp(Number(data.breakMinutes), 1, 60, DEFAULT_SETTINGS.breakMinutes),
+    longBreakMinutes: clamp(Number(data.longBreakMinutes), 1, 120, DEFAULT_SETTINGS.longBreakMinutes),
+    cycles: clamp(Number(data.cycles), 1, 12, DEFAULT_SETTINGS.cycles)
   }
 }
 
@@ -57,7 +107,7 @@ function restore(): void {
   }
   if (!stored || typeof stored !== 'object') return
   const data = stored as Partial<StoredTimer>
-  if (data.mode !== 'focus' && data.mode !== 'break') return
+  if (data.mode !== 'focus' && data.mode !== 'break' && data.mode !== 'longBreak') return
   const savedMode = data.mode
   const savedRemaining = typeof data.remaining === 'number' && Number.isFinite(data.remaining)
     ? Math.min(durationFor(savedMode), Math.max(0, Math.round(data.remaining)))
@@ -66,6 +116,9 @@ function restore(): void {
   remaining.value = savedRemaining
   started.value = data.started === true
   completed.value = data.completed === true
+  focusCount.value = typeof data.focusCount === 'number' && Number.isFinite(data.focusCount)
+    ? Math.max(0, Math.round(data.focusCount))
+    : 0
   if (data.running === true && typeof data.endsAt === 'number' && Number.isFinite(data.endsAt)) {
     endsAt.value = data.endsAt
     running.value = true
@@ -90,6 +143,7 @@ function complete(): void {
   endsAt.value = null
   remaining.value = 0
   completed.value = true
+  if (mode.value === 'focus') focusCount.value += 1
   stopTicker()
   playChime()
   persist()
@@ -146,20 +200,48 @@ function setMode(next: TimerMode): void {
   reset()
 }
 
+// Os ajustes valem na hora: se o cronômetro ainda não começou, o tempo em tela já reflete o novo
+// valor; se estiver rodando, a mudança só entra no próximo ciclo.
+function updateSettings(next: Partial<PomodoroSettings>): void {
+  settings.value = {
+    focusMinutes: clamp(next.focusMinutes ?? settings.value.focusMinutes, 1, 180, DEFAULT_SETTINGS.focusMinutes),
+    breakMinutes: clamp(next.breakMinutes ?? settings.value.breakMinutes, 1, 60, DEFAULT_SETTINGS.breakMinutes),
+    longBreakMinutes: clamp(next.longBreakMinutes ?? settings.value.longBreakMinutes, 1, 120, DEFAULT_SETTINGS.longBreakMinutes),
+    cycles: clamp(next.cycles ?? settings.value.cycles, 1, 12, DEFAULT_SETTINGS.cycles)
+  }
+  persistSettings()
+  if (!running.value && !started.value) {
+    remaining.value = durationFor(mode.value)
+    completed.value = false
+  }
+  persist()
+}
+
+// Fecha um bloco de foco: a cada `cycles` focos o próximo intervalo vira descanso longo.
+function advanceAfterFocus(): void {
+  mode.value = focusCount.value % settings.value.cycles === 0 ? 'longBreak' : 'break'
+  reset()
+}
+
+const duration = computed(() => durationFor(mode.value))
+
 const isActive = computed(
   () => running.value || started.value || completed.value || remaining.value < durationFor(mode.value)
 )
 
 const elapsedMinutes = computed(() => {
   if (mode.value !== 'focus') return 0
-  return Math.max(1, Math.round((FOCUS_SECONDS - remaining.value) / 60))
+  return Math.max(1, Math.round((durationFor('focus') - remaining.value) / 60))
 })
 
 const timeLeft = computed(
   () => `${String(Math.floor(remaining.value / 60)).padStart(2, '0')}:${String(remaining.value % 60).padStart(2, '0')}`
 )
 
-if (typeof window !== 'undefined') restore()
+if (typeof window !== 'undefined') {
+  restoreSettings()
+  restore()
+}
 
 export function usePomodoroTimer() {
   return {
@@ -168,6 +250,9 @@ export function usePomodoroTimer() {
     remaining,
     started,
     completed,
+    focusCount,
+    settings,
+    duration,
     isActive,
     elapsedMinutes,
     timeLeft,
@@ -175,6 +260,8 @@ export function usePomodoroTimer() {
     pause,
     toggle,
     reset,
-    setMode
+    setMode,
+    updateSettings,
+    advanceAfterFocus
   }
 }

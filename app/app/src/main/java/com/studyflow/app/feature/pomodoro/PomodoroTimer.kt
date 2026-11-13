@@ -16,26 +16,55 @@ import kotlinx.serialization.json.Json
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-const val FOCUS_SECONDS = 25 * 60
-const val BREAK_SECONDS = 5 * 60
+const val DEFAULT_FOCUS_MINUTES = 25
+const val DEFAULT_BREAK_MINUTES = 5
+const val DEFAULT_LONG_BREAK_MINUTES = 15
+const val DEFAULT_CYCLES = 4
 
-enum class TimerMode { FOCUS, BREAK }
+enum class TimerMode { FOCUS, BREAK, LONG_BREAK }
+
+/** Mesmos limites do web: os ajustes são salvos localmente e valem a partir do próximo ciclo. */
+data class PomodoroSettings(
+    val focusMinutes: Int = DEFAULT_FOCUS_MINUTES,
+    val breakMinutes: Int = DEFAULT_BREAK_MINUTES,
+    val longBreakMinutes: Int = DEFAULT_LONG_BREAK_MINUTES,
+    val cycles: Int = DEFAULT_CYCLES,
+) {
+    fun minutesFor(mode: TimerMode): Int = when (mode) {
+        TimerMode.FOCUS -> focusMinutes
+        TimerMode.BREAK -> breakMinutes
+        TimerMode.LONG_BREAK -> longBreakMinutes
+    }
+
+    fun durationSeconds(mode: TimerMode): Int = minutesFor(mode) * 60
+
+    fun sanitized(): PomodoroSettings = PomodoroSettings(
+        focusMinutes = focusMinutes.coerceIn(1, 180),
+        breakMinutes = breakMinutes.coerceIn(1, 60),
+        longBreakMinutes = longBreakMinutes.coerceIn(1, 120),
+        cycles = cycles.coerceIn(1, 12),
+    )
+}
 
 data class PomodoroTimerState(
     val mode: TimerMode = TimerMode.FOCUS,
     val running: Boolean = false,
-    val remainingSeconds: Int = FOCUS_SECONDS,
+    val remainingSeconds: Int = DEFAULT_FOCUS_MINUTES * 60,
     val started: Boolean = false,
     val completed: Boolean = false,
+    val focusCount: Int = 0,
+    val settings: PomodoroSettings = PomodoroSettings(),
 ) {
-    val durationSeconds: Int get() = if (mode == TimerMode.FOCUS) FOCUS_SECONDS else BREAK_SECONDS
+    val durationSeconds: Int get() = settings.durationSeconds(mode)
     val isActive: Boolean
         get() = running || started || completed || remainingSeconds < durationSeconds
     val timeLeft: String
         get() = "%02d:%02d".format(remainingSeconds / 60, remainingSeconds % 60)
     val elapsedMinutes: Int
         get() = if (mode != TimerMode.FOCUS) 0
-        else max(1, ((FOCUS_SECONDS - remainingSeconds) / 60.0).roundToInt())
+        else max(1, ((durationSeconds - remainingSeconds) / 60.0).roundToInt())
+    /** Contador "Sessão X de N" do ciclo atual. */
+    val sessionNumber: Int get() = (focusCount % settings.cycles) + 1
 }
 
 @Serializable
@@ -43,14 +72,24 @@ private data class StoredTimer(
     val mode: String = TimerMode.FOCUS.name,
     val running: Boolean = false,
     val endsAt: Long? = null,
-    val remaining: Int = FOCUS_SECONDS,
+    val remaining: Int = DEFAULT_FOCUS_MINUTES * 60,
     val started: Boolean = false,
     val completed: Boolean = false,
+    val focusCount: Int = 0,
+)
+
+@Serializable
+private data class StoredSettings(
+    val focusMinutes: Int = DEFAULT_FOCUS_MINUTES,
+    val breakMinutes: Int = DEFAULT_BREAK_MINUTES,
+    val longBreakMinutes: Int = DEFAULT_LONG_BREAK_MINUTES,
+    val cycles: Int = DEFAULT_CYCLES,
 )
 
 /**
  * Cronômetro Pomodoro compartilhado pelo app inteiro (como o composable global do web):
- * sobrevive à navegação e ao processo via `SharedPreferences` na chave `studyflow-pomodoro`.
+ * sobrevive à navegação e ao processo via `SharedPreferences` nas chaves `studyflow-pomodoro`
+ * e `studyflow-pomodoro-settings`.
  */
 class PomodoroTimer(
     private val preferences: AppPreferences,
@@ -60,7 +99,7 @@ class PomodoroTimer(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val _state = MutableStateFlow(PomodoroTimerState())
+    private val _state = MutableStateFlow(PomodoroTimerState(settings = restoreSettings()))
     val state: StateFlow<PomodoroTimerState> = _state.asStateFlow()
 
     private var endsAt: Long? = null
@@ -119,12 +158,37 @@ class PomodoroTimer(
             it.copy(
                 mode = mode,
                 running = false,
-                remainingSeconds = if (mode == TimerMode.FOCUS) FOCUS_SECONDS else BREAK_SECONDS,
+                remainingSeconds = it.settings.durationSeconds(mode),
                 started = false,
                 completed = false,
             )
         }
         persist()
+    }
+
+    // Os ajustes valem na hora: se o ciclo ainda não começou, o tempo em tela já reflete o novo
+    // valor; se estiver rodando, a mudança entra no próximo ciclo.
+    fun updateSettings(next: PomodoroSettings) {
+        val settings = next.sanitized()
+        _state.update {
+            val updated = it.copy(settings = settings)
+            if (it.running || it.started) {
+                updated
+            } else {
+                updated.copy(
+                    remainingSeconds = settings.durationSeconds(it.mode),
+                    completed = false,
+                )
+            }
+        }
+        persistSettings()
+        persist()
+    }
+
+    // Fecha um bloco de foco: a cada `cycles` focos o próximo intervalo vira descanso longo.
+    fun advanceAfterFocus() {
+        val current = _state.value
+        setMode(if (current.focusCount % current.settings.cycles == 0) TimerMode.LONG_BREAK else TimerMode.BREAK)
     }
 
     private fun tick() {
@@ -143,7 +207,12 @@ class PomodoroTimer(
     private fun complete() {
         endsAt = null
         _state.update {
-            it.copy(running = false, remainingSeconds = 0, completed = true)
+            it.copy(
+                running = false,
+                remainingSeconds = 0,
+                completed = true,
+                focusCount = if (it.mode == TimerMode.FOCUS) it.focusCount + 1 else it.focusCount,
+            )
         }
         sound.play()
         persist()
@@ -161,22 +230,51 @@ class PomodoroTimer(
             remaining = current.remainingSeconds,
             started = current.started,
             completed = current.completed,
+            focusCount = current.focusCount,
         )
         runCatching { preferences.writeString(STORAGE_KEY, json.encodeToString(StoredTimer.serializer(), stored)) }
+    }
+
+    private fun persistSettings() {
+        val settings = _state.value.settings
+        val stored = StoredSettings(
+            focusMinutes = settings.focusMinutes,
+            breakMinutes = settings.breakMinutes,
+            longBreakMinutes = settings.longBreakMinutes,
+            cycles = settings.cycles,
+        )
+        runCatching {
+            preferences.writeString(SETTINGS_KEY, json.encodeToString(StoredSettings.serializer(), stored))
+        }
+    }
+
+    private fun restoreSettings(): PomodoroSettings {
+        val raw = preferences.readString(SETTINGS_KEY) ?: return PomodoroSettings()
+        val stored = runCatching { json.decodeFromString(StoredSettings.serializer(), raw) }.getOrNull()
+            ?: return PomodoroSettings()
+        return PomodoroSettings(
+            focusMinutes = stored.focusMinutes,
+            breakMinutes = stored.breakMinutes,
+            longBreakMinutes = stored.longBreakMinutes,
+            cycles = stored.cycles,
+        ).sanitized()
     }
 
     private fun restore() {
         val raw = preferences.readString(STORAGE_KEY) ?: return
         val stored = runCatching { json.decodeFromString(StoredTimer.serializer(), raw) }.getOrNull() ?: return
         val mode = runCatching { TimerMode.valueOf(stored.mode) }.getOrNull() ?: return
-        val duration = if (mode == TimerMode.FOCUS) FOCUS_SECONDS else BREAK_SECONDS
+        val duration = _state.value.settings.durationSeconds(mode)
         val remaining = stored.remaining.coerceIn(0, duration)
-        _state.value = PomodoroTimerState(
-            mode = mode,
-            remainingSeconds = remaining,
-            started = stored.started,
-            completed = stored.completed,
-        )
+        _state.update {
+            it.copy(
+                mode = mode,
+                remainingSeconds = remaining,
+                started = stored.started,
+                completed = stored.completed,
+                focusCount = stored.focusCount.coerceAtLeast(0),
+            )
+        }
         if (stored.running && stored.endsAt != null) {
             endsAt = stored.endsAt
             _state.update { it.copy(running = true) }
@@ -186,5 +284,6 @@ class PomodoroTimer(
 
     private companion object {
         const val STORAGE_KEY = "studyflow-pomodoro"
+        const val SETTINGS_KEY = "studyflow-pomodoro-settings"
     }
 }

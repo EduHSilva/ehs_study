@@ -1,6 +1,7 @@
 import { getStoredUserId, httpClient, unwrap } from '../../composables/httpClient'
 import type { DefaultResponse } from '../../composables/httpClient'
 import { addDays, dayKey, startOfDay, taskEnd, taskStart } from './calendar'
+import { isRecurringType } from './types'
 import type { DailyTaskCompletion, DailyTaskStatistics, Task, TaskInput, TaskPage, TaskStatus, TaskType, TaskUpdate } from './types'
 
 const RANGE_PAGE_SIZE = 100
@@ -32,6 +33,9 @@ interface TaskPayload {
   type?: string | null
   status?: string | null
   completedDate?: string | null
+  recurrenceDays?: number[] | null
+  recurrenceDayOfMonth?: number | null
+  weeklyGoal?: number | null
   projectId?: string | null
   stageId?: string | null
   dailyStatistics?: DailyStatsPayload | null
@@ -46,7 +50,7 @@ interface TaskPagePayload {
 }
 
 const TASK_STATUSES: TaskStatus[] = ['PENDING', 'WORKING', 'DONE', 'DELAYED', 'DELETED']
-const TASK_TYPES: TaskType[] = ['UNIQUE', 'DAILY']
+const TASK_TYPES: TaskType[] = ['UNIQUE', 'DAILY', 'WEEKLY', 'MONTHLY', 'WEEKLY_GOAL']
 
 function taskHeaders(): Record<string, string> {
   const userId = getStoredUserId()
@@ -84,6 +88,11 @@ function toDailyCompletions(payload: DailyCompletionPayload[] | null | undefined
   return result
 }
 
+function toRecurrenceDays(payload: number[] | null | undefined): number[] {
+  if (!Array.isArray(payload)) return []
+  return [...new Set(payload.filter(day => Number.isInteger(day) && day >= 1 && day <= 7))].sort((a, b) => a - b)
+}
+
 function toTask(payload: TaskPayload): Task {
   return {
     id: payload.id,
@@ -94,6 +103,9 @@ function toTask(payload: TaskPayload): Task {
     type: toType(payload.type),
     status: toStatus(payload.status),
     completedDate: payload.completedDate ?? null,
+    recurrenceDays: toRecurrenceDays(payload.recurrenceDays),
+    recurrenceDayOfMonth: payload.recurrenceDayOfMonth ?? null,
+    weeklyGoal: payload.weeklyGoal ?? null,
     projectId: payload.projectId ?? null,
     stageId: payload.stageId ?? null,
     dailyStatistics: toDailyStats(payload.dailyStatistics),
@@ -158,7 +170,7 @@ export async function getTasksInRange(from: Date, to: Date, size = RANGE_PAGE_SI
   const toMs = startOfDay(to).getTime()
   return collected.filter(task => {
     if (task.status === 'DELETED') return false
-    if (task.type === 'DAILY') {
+    if (isRecurringType(task.type)) {
       const start = taskStart(task)
       return !start || startOfDay(start).getTime() <= toMs
     }
@@ -206,7 +218,10 @@ export async function createTask(input: TaskInput): Promise<Task> {
       endDate: input.endDate,
       type: input.type,
       projectId: input.projectId ?? null,
-      stageId: input.stageId ?? null
+      stageId: input.stageId ?? null,
+      recurrenceDays: input.recurrenceDays ?? null,
+      recurrenceDayOfMonth: input.recurrenceDayOfMonth ?? null,
+      weeklyGoal: input.weeklyGoal ?? null
     })
   })
   return toTask(unwrap(res))
@@ -223,6 +238,9 @@ export async function updateTask(input: TaskUpdate & { id: string }): Promise<Ta
   if (input.completionDate) body.completionDate = input.completionDate
   if (input.projectId !== undefined) body.projectId = input.projectId
   if (input.stageId !== undefined) body.stageId = input.stageId
+  if (input.recurrenceDays !== undefined) body.recurrenceDays = input.recurrenceDays
+  if (input.recurrenceDayOfMonth !== undefined) body.recurrenceDayOfMonth = input.recurrenceDayOfMonth
+  if (input.weeklyGoal !== undefined) body.weeklyGoal = input.weeklyGoal
   const res = await httpClient<DefaultResponse<TaskPayload>>(`/tasks/${input.id}`, {
     method: 'PUT',
     headers: taskHeaders(),

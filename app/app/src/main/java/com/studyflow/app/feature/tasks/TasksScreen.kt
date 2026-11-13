@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +68,7 @@ import com.studyflow.app.core.ui.components.ContentCard
 import com.studyflow.app.core.ui.components.DateTimeField
 import com.studyflow.app.core.ui.components.EmptyNote
 import com.studyflow.app.core.ui.components.ErrorBanner
+import com.studyflow.app.core.ui.components.FieldLabel
 import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.PickerField
 import com.studyflow.app.core.ui.components.SegmentedToggle
@@ -79,11 +82,20 @@ import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
 import com.studyflow.app.domain.tasks.TaskFormat
+import com.studyflow.app.domain.tasks.TaskStats
 import com.studyflow.app.ui.appViewModel
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.TextStyle
+
+private val TASK_TYPES = listOf(
+    TaskType.UNIQUE,
+    TaskType.DAILY,
+    TaskType.WEEKLY,
+    TaskType.MONTHLY,
+    TaskType.WEEKLY_GOAL,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,8 +120,14 @@ fun TasksScreen() {
     var typeName by rememberSaveable { mutableStateOf(TaskType.UNIQUE.name) }
     var startDate by remember { mutableStateOf<LocalDateTime?>(null) }
     var endDate by remember { mutableStateOf<LocalDateTime?>(null) }
+    var weekdayText by rememberSaveable { mutableStateOf("") }
+    var monthDayText by rememberSaveable { mutableStateOf("") }
+    var weeklyGoalText by rememberSaveable { mutableStateOf("") }
 
-    val type = if (typeName == TaskType.DAILY.name) TaskType.DAILY else TaskType.UNIQUE
+    val type = TASK_TYPES.firstOrNull { it.name == typeName } ?: TaskType.UNIQUE
+    val recurrenceDays = remember(weekdayText) {
+        weekdayText.split(',').mapNotNull { it.toIntOrNull() }.filter { it in 1..7 }.sorted()
+    }
 
     LaunchedEffect(state.formOpen) {
         if (!state.formOpen) {
@@ -117,6 +135,9 @@ fun TasksScreen() {
             typeName = TaskType.UNIQUE.name
             startDate = null
             endDate = null
+            weekdayText = ""
+            monthDayText = ""
+            weeklyGoalText = ""
         }
     }
 
@@ -126,6 +147,9 @@ fun TasksScreen() {
         typeName = task.type.name
         startDate = ApiDates.localDateTimeOrNull(task.startDate)
         endDate = ApiDates.localDateTimeOrNull(task.endDate)
+        weekdayText = task.recurrenceDays.sorted().joinToString(",")
+        monthDayText = task.recurrenceDayOfMonth?.toString().orEmpty()
+        weeklyGoalText = task.weeklyGoal?.toString().orEmpty()
     }
 
     val formBusy = state.creating || state.updating
@@ -167,12 +191,36 @@ fun TasksScreen() {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                SegmentedToggle(
-                    options = listOf(s["taskTypeUnique"], s["taskTypeDaily"]),
-                    selectedIndex = if (type == TaskType.UNIQUE) 0 else 1,
-                    onSelect = { index -> typeName = if (index == 0) TaskType.UNIQUE.name else TaskType.DAILY.name },
+                PickerField(
+                    label = s["taskTypeLabel"],
+                    value = s[typeLabelKey(type)],
+                    options = TASK_TYPES.map { s[typeLabelKey(it)] },
+                    onSelect = { index -> typeName = TASK_TYPES[index].name },
                 )
-                if (type == TaskType.UNIQUE || state.editingId != null) {
+                if (type == TaskType.WEEKLY) {
+                    WeekdayPicker(
+                        selected = recurrenceDays,
+                        onToggle = { day ->
+                            val next = if (day in recurrenceDays) recurrenceDays - day else recurrenceDays + day
+                            weekdayText = next.sorted().joinToString(",")
+                        },
+                    )
+                }
+                if (type == TaskType.MONTHLY) {
+                    NumberField(
+                        label = s["taskMonthDayLabel"],
+                        value = monthDayText,
+                        onChange = { monthDayText = it },
+                    )
+                }
+                if (type == TaskType.WEEKLY_GOAL) {
+                    NumberField(
+                        label = s["taskWeeklyGoalLabel"],
+                        value = weeklyGoalText,
+                        onChange = { weeklyGoalText = it },
+                    )
+                }
+                if (type != TaskType.DAILY || state.editingId != null) {
                     DateTimeField(
                         label = s["taskStartDateLabel"],
                         value = startDate,
@@ -218,7 +266,17 @@ fun TasksScreen() {
                         shape = RoundedCornerShape(8.dp),
                     ) { Text(s["cancelAction"]) }
                     Button(
-                        onClick = { vm.submitForm(title, startDate, endDate, type) },
+                        onClick = {
+                            vm.submitForm(
+                                title = title,
+                                start = startDate,
+                                end = endDate,
+                                type = type,
+                                recurrenceDays = recurrenceDays,
+                                recurrenceDayOfMonth = monthDayText.toIntOrNull(),
+                                weeklyGoal = weeklyGoalText.toIntOrNull(),
+                            )
+                        },
                         enabled = !formBusy,
                         modifier = Modifier.weight(1f).height(44.dp),
                         shape = RoundedCornerShape(8.dp),
@@ -249,13 +307,7 @@ fun TasksScreen() {
         return
     }
 
-    val isDone: (Task) -> Boolean = { task ->
-        (task.type == TaskType.DAILY &&
-            StudyCalendar.isCompletedOn(task, state.targetDay, state.todayKey)) ||
-            (task.type != TaskType.DAILY && task.status == TaskStatus.DONE)
-    }
     val pendingCount = state.items.count { !StudyCalendar.isTaskDone(it, state.todayKey) }
-    val dailyCount = state.items.count { it.type == TaskType.DAILY }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -297,6 +349,30 @@ fun TasksScreen() {
             }
 
             item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    PickerField(
+                        label = s["taskFilterProject"],
+                        value = state.projects.firstOrNull { it.id == state.projectFilter }?.title
+                            ?: s["taskFilterAll"],
+                        options = listOf(s["taskFilterAll"]) + state.projects.map { it.title },
+                        onSelect = { index ->
+                            vm.setProjectFilter(if (index == 0) null else state.projects[index - 1].id)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(
+                        onClick = vm::toggleStats,
+                        modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                    ) { Text(s["taskStatsToggle"]) }
+                }
+            }
+
+            item {
                 CalendarCard(
                     state = state,
                     onNavigate = vm::navigate,
@@ -306,18 +382,28 @@ fun TasksScreen() {
                 )
             }
 
+            if (state.statsOpen) {
+                item {
+                    StatsCard(
+                        state = state,
+                        onRetry = vm::loadStats,
+                    )
+                }
+            }
+
             item {
                 ContentCard {
                     if (state.items.isEmpty()) {
                         EmptyNote(s["noTasks"])
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             state.items.forEach { task ->
                                 TaskRow(
                                     task = task,
-                                    done = isDone(task),
+                                    done = vm.isDone(task),
                                     saving = state.savingId == task.id,
                                     deleting = state.deletingId == task.id,
+                                    enabled = vm.canToggle(task),
                                     selectedDay = state.selectedDay,
                                     todayKey = state.todayKey,
                                     projectName = state.projects.firstOrNull { it.id == task.projectId }?.title,
@@ -365,7 +451,7 @@ fun TasksScreen() {
                     buildString {
                         append(s.format("taskPendingCount", "count" to pendingCount, "total" to state.total))
                         append(" · ")
-                        append(s.format("taskDailyCount", "count" to dailyCount))
+                        append(s.format("taskRecurringCount", "count" to state.recurringCount))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = StudyFlowTheme.colors.subtle,
@@ -386,6 +472,163 @@ fun TasksScreen() {
     }
 }
 
+private fun typeLabelKey(type: TaskType): String = when (type) {
+    TaskType.UNIQUE -> "taskTypeUnique"
+    TaskType.DAILY -> "taskTypeDaily"
+    TaskType.WEEKLY -> "taskTypeWeekly"
+    TaskType.MONTHLY -> "taskTypeMonthly"
+    TaskType.WEEKLY_GOAL -> "taskTypeWeeklyGoal"
+}
+
+@Composable
+private fun WeekdayPicker(selected: List<Int>, onToggle: (Int) -> Unit) {
+    val s = LocalStrings.current
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(s["taskWeekdaysLabel"])
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val monday = LocalDate.of(2024, 1, 1)
+            (0..6).forEach { offset ->
+                val day = offset + 1
+                val active = day in selected
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .background(
+                            if (active) StudyFlowTheme.colors.primarySoft else MaterialTheme.colorScheme.background,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .border(
+                            1.dp,
+                            if (active) MaterialTheme.colorScheme.primary else StudyFlowTheme.colors.border,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .clickable { onToggle(day) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        monday.plusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.NARROW, s.locale),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumberField(label: String, value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { text ->
+            if (text.length <= 2 && text.all { it.isDigit() }) onChange(text)
+        },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun StatsCard(state: TasksUiState, onRetry: () -> Unit) {
+    val s = LocalStrings.current
+    ContentCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(s["taskStatsTitle"], style = MaterialTheme.typography.titleMedium)
+            Text(
+                s["taskStatsPeriod"],
+                style = MaterialTheme.typography.labelSmall,
+                color = StudyFlowTheme.colors.subtle,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        when {
+            state.statsErrorKey != null -> ErrorBanner(
+                message = s[state.statsErrorKey],
+                onRetry = onRetry,
+                retryLabel = s["retry"],
+            )
+            state.statsLoading -> Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+            state.statsTasks.isEmpty() -> EmptyNote(s["taskStatsEmpty"])
+            else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                state.statsTasks.forEach { entry ->
+                    StatsRow(entry)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(entry: TaskStats) {
+    val s = LocalStrings.current
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                entry.task.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Tag(
+                text = s[typeLabelKey(entry.task.type)],
+                color = MaterialTheme.colorScheme.primary,
+                background = StudyFlowTheme.colors.primarySoft,
+            )
+        }
+        if (entry.task.type == TaskType.WEEKLY_GOAL) {
+            Text(
+                listOf(
+                    s.format("taskStatsWeeksOk", "count" to entry.weeksOk),
+                    s.format("taskStatsWeeksFailed", "count" to entry.weeksFailed),
+                    s.format(
+                        "taskStatsCurrentWeek",
+                        "done" to entry.currentWeekDone,
+                        "goal" to (entry.currentWeekGoal ?: 0),
+                    ),
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                s[if (entry.currentWeekMet) "taskStatsGoalMet" else "taskStatsGoalOpen"],
+                style = MaterialTheme.typography.labelMedium,
+                color = if (entry.currentWeekMet) StudyFlowTheme.colors.success else StudyFlowTheme.colors.subtle,
+            )
+        } else {
+            Text(
+                listOf(
+                    s.format("taskStatsCompleted", "count" to entry.completed),
+                    s.format("taskStatsFailures", "count" to entry.failed),
+                    s.format("taskStatsRate", "rate" to entry.rate),
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun CalendarCard(
     state: TasksUiState,
@@ -395,8 +638,8 @@ private fun CalendarCard(
     onClearFilter: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val calendar = remember(state.periodTasks, state.anchor, state.mode, state.todayKey) {
-        StudyCalendar.buildCalendarGrid(state.periodTasks, state.anchor, state.mode, state.todayKey)
+    val calendar = remember(state.visibleTasks, state.anchor, state.mode, state.todayKey) {
+        StudyCalendar.buildCalendarGrid(state.visibleTasks, state.anchor, state.mode, state.todayKey)
     }
     val locale = s.locale
 
@@ -567,6 +810,7 @@ private fun TaskRow(
     done: Boolean,
     saving: Boolean,
     deleting: Boolean,
+    enabled: Boolean,
     selectedDay: String?,
     todayKey: String,
     projectName: String?,
@@ -576,8 +820,26 @@ private fun TaskRow(
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val rowDay = selectedDay ?: if (task.type == TaskType.DAILY) todayKey else ""
-    val completedDays = task.dailyCompletions.size
+    val rowDay = selectedDay
+        ?: if (task.type != TaskType.UNIQUE && StudyCalendar.scheduledOn(task, todayKey)) todayKey else ""
+    val recurring = task.type != TaskType.UNIQUE
+
+    val statsText = when {
+        task.type == TaskType.WEEKLY_GOAL -> {
+            val progress = StudyCalendar.weeklyGoalProgress(task, todayKey)
+            s.format("taskWeeklyGoalProgress", "done" to progress.done, "goal" to progress.goal) +
+                if (progress.met) " · ${s["taskStatsGoalMet"]}" else ""
+        }
+        recurring -> task.dailyCompletions.size.takeIf { it > 0 }
+            ?.let { s.format("taskDailyDoneCount", "count" to it) }
+            .orEmpty()
+        else -> ""
+    }
+    val meta = listOfNotNull(
+        "${s["endDateLabel"]} ${TaskFormat.formatTaskPeriod(task.startDate, task.endDate, s.locale)}",
+        listOfNotNull(projectName, stageName).joinToString(" · ").ifBlank { null },
+        statsText.ifBlank { null },
+    ).joinToString(" · ")
 
     Row(
         modifier = Modifier
@@ -588,78 +850,77 @@ private fun TaskRow(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(enabled = !saving, onClick = onToggle)
-                .padding(vertical = 8.dp),
+                .clickable(enabled = enabled && !saving && !deleting, onClick = onToggle)
+                .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             CheckSquare(checked = done)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    task.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
-                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${s["endDateLabel"]} ${TaskFormat.formatTaskPeriod(task.startDate, task.endDate, s.locale)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = StudyFlowTheme.colors.subtle,
-                )
-                val link = listOfNotNull(projectName, stageName).joinToString(" · ")
-                if (link.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        link,
+                        task.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (rowDay.isNotBlank()) {
+                        Tag(
+                            text = TaskFormat.formatDayChip(rowDay, s.locale),
+                            color = if (rowDay == todayKey) MaterialTheme.colorScheme.primary else StudyFlowTheme.colors.subtle,
+                            background = if (rowDay == todayKey) StudyFlowTheme.colors.primarySoft else MaterialTheme.colorScheme.background,
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        meta,
+                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
                         color = StudyFlowTheme.colors.subtle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (recurring) {
+                        Tag(
+                            text = s[typeLabelKey(task.type)],
+                            color = MaterialTheme.colorScheme.primary,
+                            background = StudyFlowTheme.colors.primarySoft,
+                        )
+                    }
+                    if (task.status == TaskStatus.DELAYED) {
+                        Tag(text = s["taskDelayed"])
+                    }
                 }
-                if (completedDays > 0) {
-                    Text(
-                        s.format("taskDailyDoneCount", "count" to completedDays),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StudyFlowTheme.colors.subtle,
-                    )
-                }
-            }
-            if (rowDay.isNotBlank()) {
-                Tag(
-                    text = TaskFormat.formatDayChip(rowDay, s.locale),
-                    color = if (rowDay == todayKey) MaterialTheme.colorScheme.primary else StudyFlowTheme.colors.subtle,
-                    background = if (rowDay == todayKey) StudyFlowTheme.colors.primarySoft else MaterialTheme.colorScheme.background,
-                )
-            }
-            if (task.type == TaskType.DAILY) {
-                Tag(
-                    text = s["taskTypeDaily"],
-                    color = MaterialTheme.colorScheme.primary,
-                    background = StudyFlowTheme.colors.primarySoft,
-                )
-            }
-            if (task.status == TaskStatus.DELAYED) {
-                Tag(text = s["taskDelayed"])
             }
         }
-        IconButton(onClick = onEdit, enabled = !deleting) {
+        IconButton(onClick = onEdit, enabled = !deleting, modifier = Modifier.size(34.dp)) {
             Icon(
                 Icons.Filled.Edit,
                 contentDescription = s["taskEditAction"],
                 tint = StudyFlowTheme.colors.subtle,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(15.dp),
             )
         }
-        IconButton(onClick = onDelete, enabled = !deleting) {
+        IconButton(onClick = onDelete, enabled = !deleting, modifier = Modifier.size(34.dp)) {
             if (deleting) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
             } else {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = s["taskDeleteAction"],
                     tint = StudyFlowTheme.colors.subtle,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(15.dp),
                 )
             }
         }

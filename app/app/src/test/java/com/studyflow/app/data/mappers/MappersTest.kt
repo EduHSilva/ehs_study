@@ -29,4 +29,37 @@ class MappersTest {
 
         assertEquals(null, task.completedDate)
     }
+
+    @Test
+    fun `task keeps recurrence configuration`() {
+        val task = Mappers.task(
+            TaskDto(
+                id = "task-3",
+                title = "Meta semanal",
+                type = "WEEKLY_GOAL",
+                weeklyGoal = 2,
+            ),
+        )
+        val monthly = Mappers.task(
+            TaskDto(
+                id = "task-4",
+                title = "Relatório mensal",
+                type = "MONTHLY",
+                recurrenceDayOfMonth = 31,
+            ),
+        )
+        val weekly = Mappers.task(
+            TaskDto(
+                id = "task-5",
+                title = "Aula",
+                type = "WEEKLY",
+                recurrenceDays = listOf(2, 4),
+            ),
+        )
+
+        assertEquals(com.studyflow.app.data.model.TaskType.WEEKLY_GOAL, task.type)
+        assertEquals(2, task.weeklyGoal ?: 0)
+        assertEquals(31, monthly.recurrenceDayOfMonth ?: 0)
+        assertEquals(listOf(2, 4), weekly.recurrenceDays)
+    }
 }

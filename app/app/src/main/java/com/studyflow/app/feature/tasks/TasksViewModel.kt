@@ -16,6 +16,8 @@ import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
 import com.studyflow.app.domain.tasks.TaskFormat
+import com.studyflow.app.domain.tasks.TaskStats
+import com.studyflow.app.domain.tasks.TaskStatsBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 const val TASKS_PAGE_SIZE = 10
+
+private const val STATS_DAYS = 83L // últimas 12 semanas
 
 data class TasksUiState(
     val items: List<Task> = emptyList(),
@@ -47,6 +51,11 @@ data class TasksUiState(
     val selectedDay: String? = todayKey,
     // Lista já filtrada (todas as páginas), usada pelo "copiar tarefas".
     val filteredTasks: List<Task> = emptyList(),
+    val projectFilter: String? = null,
+    val statsOpen: Boolean = false,
+    val statsLoading: Boolean = false,
+    val statsTasks: List<TaskStats> = emptyList(),
+    val statsErrorKey: String? = null,
     val formOpen: Boolean = false,
     val creating: Boolean = false,
     val updating: Boolean = false,
@@ -62,6 +71,9 @@ data class TasksUiState(
     val canGoNext: Boolean get() = page < lastPage
     val targetDay: String get() = selectedDay ?: todayKey
     val formStages: List<ProjectStage> get() = formProjectId?.let { stagesByProject[it] }.orEmpty()
+    val recurringCount: Int get() = items.count { it.type != TaskType.UNIQUE }
+    val visibleTasks: List<Task>
+        get() = projectFilter?.let { id -> periodTasks.filter { it.projectId == id } } ?: periodTasks
     val editingTask: Task?
         get() = editingId?.let { id ->
             items.firstOrNull { it.id == id } ?: periodTasks.firstOrNull { it.id == id }
@@ -108,6 +120,12 @@ class TasksViewModel(
 
     fun selectFormStage(id: String?) {
         _state.update { it.copy(formStageId = id) }
+    }
+
+    fun setProjectFilter(id: String?) {
+        if (_state.value.projectFilter == id) return
+        _state.update { it.copy(projectFilter = id, page = 0) }
+        applyFilter()
     }
 
     fun refresh() {
@@ -169,14 +187,14 @@ class TasksViewModel(
         val current = _state.value
         val key = current.selectedDay
         if (key != null) {
-            paginate(current.periodTasks.filter { StudyCalendar.taskCoversDay(it, key, current.todayKey) })
+            paginate(current.visibleTasks.filter { StudyCalendar.taskCoversDay(it, key, current.todayKey) })
             return
         }
         val (from, to) = StudyCalendar.rangeFor(current.anchor, current.mode)
         paginate(
-            current.periodTasks.filter { task ->
+            current.visibleTasks.filter { task ->
                 if (task.status == TaskStatus.DELETED) return@filter false
-                if (task.type == TaskType.DAILY) {
+                if (task.type != TaskType.UNIQUE) {
                     val start = StudyCalendar.taskStart(task)
                     start == null || !start.isAfter(to)
                 } else {
@@ -272,14 +290,18 @@ class TasksViewModel(
 
     fun isDone(task: Task): Boolean = isDone(task, _state.value)
 
+    fun canToggle(task: Task): Boolean = StudyCalendar.canComplete(task, _state.value.targetDay)
+
     // Copia a lista filtrada inteira (não só a página visível) como checklist para colar fora do app.
     fun copyTasksText(): String? =
         TaskFormat.formatTaskList(_state.value.filteredTasks.map { it.title }).ifEmpty { null }
 
     private fun isDone(task: Task, current: TasksUiState): Boolean =
-        (task.type == TaskType.DAILY &&
-            StudyCalendar.isCompletedOn(task, current.targetDay, current.todayKey)) ||
-            (task.type != TaskType.DAILY && task.status == TaskStatus.DONE)
+        if (task.type != TaskType.UNIQUE) {
+            StudyCalendar.isCompletedOn(task, current.targetDay, current.todayKey)
+        } else {
+            task.status == TaskStatus.DONE
+        }
 
     fun toggleForm() {
         _state.update {
@@ -318,12 +340,34 @@ class TasksViewModel(
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
+        recurrenceDays: List<Int>,
+        recurrenceDayOfMonth: Int?,
+        weeklyGoal: Int?,
     ) {
         if (_state.value.editingId != null) {
-            saveEdit(title, start, end, type)
+            saveEdit(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
         } else {
-            create(title, start, end, type)
+            create(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
         }
+    }
+
+    private fun validate(
+        title: String,
+        start: LocalDateTime?,
+        end: LocalDateTime?,
+        type: TaskType,
+        recurrenceDays: List<Int>,
+        recurrenceDayOfMonth: Int?,
+        weeklyGoal: Int?,
+    ): String? = when {
+        title.trim().isEmpty() -> "taskTitleRequired"
+        type == TaskType.UNIQUE && start != null && end != null && start.isAfter(end) -> "taskRangeInverted"
+        type == TaskType.WEEKLY && recurrenceDays.isEmpty() -> "taskWeekdaysRequired"
+        type == TaskType.MONTHLY && (recurrenceDayOfMonth == null || recurrenceDayOfMonth !in 1..31) ->
+            "taskMonthDayRequired"
+        type == TaskType.WEEKLY_GOAL && (weeklyGoal == null || weeklyGoal !in 1..7) ->
+            "taskWeeklyGoalRequired"
+        else -> null
     }
 
     private fun closeForm() {
@@ -338,21 +382,19 @@ class TasksViewModel(
         }
     }
 
-    fun create(
+    private fun create(
         title: String,
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
+        recurrenceDays: List<Int>,
+        recurrenceDayOfMonth: Int?,
+        weeklyGoal: Int?,
     ) {
         val current = _state.value
         if (current.creating) return
-        val trimmed = title.trim()
-        if (trimmed.isEmpty()) {
-            _state.update { it.copy(formErrorKey = "taskTitleRequired") }
-            return
-        }
-        if (type == TaskType.UNIQUE && start != null && end != null && start.isAfter(end)) {
-            _state.update { it.copy(formErrorKey = "taskRangeInverted") }
+        validate(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)?.let { error ->
+            _state.update { it.copy(formErrorKey = error) }
             return
         }
         viewModelScope.launch {
@@ -361,18 +403,21 @@ class TasksViewModel(
                 val endIso = end?.let(ApiDates::toIso)
                 val linkProject = current.formProjectId
                 val linkStage = current.formProjectId?.let { current.formStageId }
-                val input = if (type == TaskType.DAILY) {
+                val input = if (type != TaskType.UNIQUE) {
                     TaskInput(
-                        title = trimmed,
+                        title = title.trim(),
                         startDate = start?.let(ApiDates::toIso) ?: Instant.now().toString(),
                         endDate = endIso,
-                        type = TaskType.DAILY,
+                        type = type,
                         projectId = linkProject,
                         stageId = linkStage,
+                        recurrenceDays = if (type == TaskType.WEEKLY) recurrenceDays.sorted() else null,
+                        recurrenceDayOfMonth = if (type == TaskType.MONTHLY) recurrenceDayOfMonth else null,
+                        weeklyGoal = if (type == TaskType.WEEKLY_GOAL) weeklyGoal else null,
                     )
                 } else {
                     TaskInput(
-                        title = trimmed,
+                        title = title.trim(),
                         startDate = start?.let(ApiDates::toIso) ?: endIso,
                         endDate = endIso,
                         type = TaskType.UNIQUE,
@@ -400,6 +445,7 @@ class TasksViewModel(
                 }
                 fetchPeriod()
                 applyFilter()
+                if (_state.value.statsOpen) loadStats()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -417,6 +463,9 @@ class TasksViewModel(
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
+        recurrenceDays: List<Int>,
+        recurrenceDayOfMonth: Int?,
+        weeklyGoal: Int?,
     ) {
         val current = _state.value
         if (current.updating) return
@@ -425,13 +474,8 @@ class TasksViewModel(
             closeForm()
             return
         }
-        val trimmed = title.trim()
-        if (trimmed.isEmpty()) {
-            _state.update { it.copy(formErrorKey = "taskTitleRequired") }
-            return
-        }
-        if (type == TaskType.UNIQUE && start != null && end != null && start.isAfter(end)) {
-            _state.update { it.copy(formErrorKey = "taskRangeInverted") }
+        validate(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)?.let { error ->
+            _state.update { it.copy(formErrorKey = error) }
             return
         }
         viewModelScope.launch {
@@ -440,22 +484,26 @@ class TasksViewModel(
                 val saved = tasksRepository.update(
                     task.id,
                     TaskUpdate(
-                        title = trimmed,
+                        title = title.trim(),
                         type = type,
                         startDate = start?.let(ApiDates::toIso),
                         endDate = end?.let(ApiDates::toIso),
                         projectId = current.formProjectId,
                         stageId = current.formProjectId?.let { current.formStageId },
                         clearProjectLink = current.formProjectId == null,
+                        recurrenceDays = if (type == TaskType.WEEKLY) recurrenceDays.sorted() else null,
+                        recurrenceDayOfMonth = if (type == TaskType.MONTHLY) recurrenceDayOfMonth else null,
+                        weeklyGoal = if (type == TaskType.WEEKLY_GOAL) weeklyGoal else null,
                     ),
                 )
-                // O PUT não devolve o histórico completo da DAILY; preserva o que a lista já tinha.
+                // O PUT não devolve o histórico completo das recorrentes; preserva o da lista.
                 val merged = saved.copy(dailyCompletions = task.dailyCompletions)
                 closeForm()
                 replaceTask(merged)
                 try {
                     fetchPeriod()
                     applyFilter()
+                    if (_state.value.statsOpen) loadStats()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -479,9 +527,13 @@ class TasksViewModel(
         val today = current.todayKey
 
         // O back recusa `completionDate` futuro e, sem intervalo, recusa qualquer data explícita.
-        if (task.type == TaskType.DAILY) {
+        if (task.type != TaskType.UNIQUE) {
             if (day > today) {
                 _state.update { it.copy(errorKey = "taskCompletionFuture") }
+                return
+            }
+            if (!StudyCalendar.canComplete(task, day)) {
+                _state.update { it.copy(errorKey = "taskCompletionNotScheduled") }
                 return
             }
             if (day != today && task.startDate.isNullOrBlank() && task.endDate.isNullOrBlank()) {
@@ -493,9 +545,9 @@ class TasksViewModel(
         val wasDone = isDone(task, current)
         val next = if (wasDone) TaskStatus.PENDING else TaskStatus.DONE
         val previous = task
-        // Numa DAILY o que muda é a lista de dias concluídos; sem intervalo o back recusa uma data
-        // explícita. Numa UNIQUE o dia vai como `completionDate`, que vira o `completedDate`.
-        val completionDate = if (task.type == TaskType.DAILY) {
+        // Numa recorrente o que muda é a lista de dias concluídos; sem intervalo o back recusa uma
+        // data explícita. Numa UNIQUE o dia vai como `completionDate`, que vira o `completedDate`.
+        val completionDate = if (task.type != TaskType.UNIQUE) {
             if (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank()) day else null
         } else {
             day
@@ -503,7 +555,7 @@ class TasksViewModel(
 
         val optimistic = task.copy(
             status = next,
-            completedDate = if (task.type == TaskType.DAILY) {
+            completedDate = if (task.type != TaskType.UNIQUE) {
                 task.completedDate
             } else {
                 if (next == TaskStatus.DONE) day else null
@@ -527,10 +579,11 @@ class TasksViewModel(
                     id,
                     TaskUpdate(status = next, completionDate = completionDate),
                 )
-                if (task.type == TaskType.DAILY) {
+                if (task.type != TaskType.UNIQUE) {
                     replaceTask(saved.copy(dailyCompletions = optimistic.dailyCompletions))
                     fetchPeriod()
                     applyFilter()
+                    if (_state.value.statsOpen) loadStats()
                 } else {
                     replaceTask(saved)
                 }
@@ -541,6 +594,33 @@ class TasksViewModel(
                 _state.update { it.copy(errorKey = "taskSaveFailed") }
             } finally {
                 _state.update { it.copy(savingId = null) }
+            }
+        }
+    }
+
+    fun toggleStats() {
+        val open = !_state.value.statsOpen
+        _state.update { it.copy(statsOpen = open, statsErrorKey = null) }
+        if (open) loadStats()
+    }
+
+    fun loadStats() {
+        viewModelScope.launch {
+            _state.update { it.copy(statsLoading = true, statsErrorKey = null) }
+            try {
+                val to = LocalDate.now()
+                val from = to.minusDays(STATS_DAYS)
+                val tasks = tasksRepository.getTasksInRange(from, to)
+                val filter = _state.value.projectFilter
+                val filtered = if (filter != null) tasks.filter { it.projectId == filter } else tasks
+                val stats = TaskStatsBuilder.build(filtered, from, to, _state.value.todayKey)
+                _state.update { it.copy(statsTasks = stats) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(statsErrorKey = "taskStatsFailed", statsTasks = emptyList()) }
+            } finally {
+                _state.update { it.copy(statsLoading = false) }
             }
         }
     }
@@ -570,6 +650,7 @@ class TasksViewModel(
                     }
                 }
                 applyFilter()
+                if (_state.value.statsOpen) loadStats()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

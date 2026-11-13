@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +44,7 @@ import com.studyflow.app.data.model.Task
 import com.studyflow.app.data.model.TaskStatus
 import com.studyflow.app.data.model.TaskType
 import com.studyflow.app.domain.ApiDates
+import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.TaskFormat
 import com.studyflow.app.feature.pomodoro.TimerMode
 import com.studyflow.app.navigation.Routes
@@ -78,6 +82,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
     }
 
     val todayTasks = state.todayTasks
+    val todayKey = java.time.LocalDate.now().toString()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -178,13 +183,20 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                s[if (timerState.mode == TimerMode.FOCUS) "focusModeShort" else "breakModeShort"],
+                                s[when (timerState.mode) {
+                                    TimerMode.FOCUS -> "focusModeShort"
+                                    TimerMode.BREAK -> "breakModeShort"
+                                    TimerMode.LONG_BREAK -> "longBreakModeShort"
+                                }],
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(
                                 when {
-                                    timerState.completed ->
-                                        s[if (timerState.mode == TimerMode.FOCUS) "focusComplete" else "breakComplete"]
+                                    timerState.completed -> s[when (timerState.mode) {
+                                        TimerMode.FOCUS -> "focusComplete"
+                                        TimerMode.BREAK -> "breakComplete"
+                                        TimerMode.LONG_BREAK -> "longBreakComplete"
+                                    }]
                                     timerState.running -> s["timerRunning"]
                                     else -> s["timerPaused"]
                                 },
@@ -246,6 +258,7 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
                         todayTasks.forEach { task ->
                             DashboardTaskRow(
                                 task = task,
+                                today = todayKey,
                                 saving = state.savingTaskId == task.id,
                                 onClick = { vm.toggleTask(task.id) },
                             )
@@ -262,22 +275,25 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
                 if (data.notes.isEmpty()) {
                     EmptyNote(s["noNotesInFolder"])
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         data.notes.forEach { note ->
-                            Column(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
                                     .clickable { onOpenNote(note.id) }
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                             ) {
-                                Text(note.title, style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    note.content,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = StudyFlowTheme.colors.subtle,
-                                    maxLines = 3,
+                                    note.title.ifBlank { s["untitledNote"] },
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
@@ -290,9 +306,9 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
 }
 
 @Composable
-private fun DashboardTaskRow(task: Task, saving: Boolean, onClick: () -> Unit) {
+private fun DashboardTaskRow(task: Task, today: String, saving: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
-    val done = task.status == TaskStatus.DONE
+    val done = StudyCalendar.isTaskDone(task, today)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -319,9 +335,15 @@ private fun DashboardTaskRow(task: Task, saving: Boolean, onClick: () -> Unit) {
                 color = StudyFlowTheme.colors.subtle,
             )
         }
-        if (task.type == TaskType.DAILY) {
+        if (task.type != TaskType.UNIQUE) {
             Tag(
-                text = s["taskTypeDaily"],
+                text = s[when (task.type) {
+                    TaskType.DAILY -> "taskTypeDaily"
+                    TaskType.WEEKLY -> "taskTypeWeekly"
+                    TaskType.MONTHLY -> "taskTypeMonthly"
+                    TaskType.WEEKLY_GOAL -> "taskTypeWeeklyGoal"
+                    TaskType.UNIQUE -> "taskTypeUnique"
+                }],
                 color = MaterialTheme.colorScheme.primary,
                 background = StudyFlowTheme.colors.primarySoft,
             )

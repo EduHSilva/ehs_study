@@ -2,6 +2,7 @@ package com.studyflow.app.feature.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.studyflow.app.data.model.DailyTaskCompletion
 import com.studyflow.app.data.model.DashboardData
 import com.studyflow.app.data.model.FocusSession
 import com.studyflow.app.data.model.Task
@@ -11,6 +12,7 @@ import com.studyflow.app.data.model.TaskUpdate
 import com.studyflow.app.data.repository.DashboardRepository
 import com.studyflow.app.data.repository.FocusRepository
 import com.studyflow.app.data.repository.TasksRepository
+import com.studyflow.app.domain.ApiDates
 import com.studyflow.app.domain.tasks.StudyCalendar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 
 data class DashboardUiState(
@@ -91,10 +94,11 @@ class DashboardViewModel(
         if (_state.value.savingTaskId == id) return
         val task = data.tasks.firstOrNull { it.id == id } ?: return
         val previous = task
-        val next = if (task.status == TaskStatus.DONE) TaskStatus.PENDING else TaskStatus.DONE
-        // Mesmo dia local que a tela de tarefas: sem uma DAILY com intervalo o back recusa a data
-        // explícita; numa UNIQUE o dia vai como `completionDate`.
         val today = LocalDate.now().toString()
+        val done = StudyCalendar.isTaskDone(task, today)
+        val next = if (done) TaskStatus.PENDING else TaskStatus.DONE
+        // Mesmo dia local que a tela de tarefas: sem uma DAILY com intervalo o back recusa a data
+        // explícita; nas demais o dia vai como `completionDate`.
         val completionDate = if (task.type == TaskType.DAILY) {
             if (!task.startDate.isNullOrBlank() || !task.endDate.isNullOrBlank()) today else null
         } else {
@@ -103,10 +107,21 @@ class DashboardViewModel(
         replaceTask(
             task.copy(
                 status = next,
-                completedDate = if (task.type == TaskType.DAILY) {
-                    task.completedDate
-                } else {
+                completedDate = if (task.type == TaskType.UNIQUE) {
                     if (next == TaskStatus.DONE) today else null
+                } else {
+                    task.completedDate
+                },
+                dailyStatistics = task.dailyStatistics?.copy(
+                    completedToday = next == TaskStatus.DONE && task.type != TaskType.UNIQUE,
+                ),
+                dailyCompletions = if (task.type == TaskType.UNIQUE) {
+                    task.dailyCompletions
+                } else if (next == TaskStatus.DONE) {
+                    task.dailyCompletions.filterNot { ApiDates.dayKeyFrom(it.completionDate) == today } +
+                        DailyTaskCompletion(today, Instant.now().toString())
+                } else {
+                    task.dailyCompletions.filterNot { ApiDates.dayKeyFrom(it.completionDate) == today }
                 },
             ),
         )

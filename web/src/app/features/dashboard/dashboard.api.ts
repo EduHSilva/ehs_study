@@ -39,7 +39,10 @@ function toTask(raw: unknown, index: number): Task | null {
     projectId: typeof item.projectId === 'string' ? item.projectId : null,
     stageId: typeof item.stageId === 'string' ? item.stageId : null,
     dailyStatistics: null,
-    dailyCompletions: []
+    dailyCompletions: [],
+    recurrenceDays: [],
+    recurrenceDayOfMonth: null,
+    weeklyGoal: null
   }
 }
 

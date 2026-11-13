@@ -21,12 +21,14 @@ data class PomodoroUiState(
     val errorKey: String? = null,
     val timer: PomodoroTimerState = PomodoroTimerState(),
 ) {
-    val sessionNumber: Int get() = (sessions.size % 4) + 1
+    val sessionNumber: Int get() = timer.sessionNumber
     val time: String get() = timer.timeLeft
     val running: Boolean get() = timer.running
-    val breakMode: Boolean get() = timer.mode == TimerMode.BREAK
+    val mode: TimerMode get() = timer.mode
+    val breakMode: Boolean get() = timer.mode != TimerMode.FOCUS
     val completed: Boolean get() = timer.completed
     val focusStarted: Boolean get() = timer.started
+    val settings: PomodoroSettings get() = timer.settings
 }
 
 private data class SessionsState(
@@ -76,8 +78,9 @@ class PomodoroViewModel(
 
     fun reset() = timer.reset()
 
-    fun setMode(breakMode: Boolean) =
-        timer.setMode(if (breakMode) TimerMode.BREAK else TimerMode.FOCUS)
+    fun setMode(mode: TimerMode) = timer.setMode(mode)
+
+    fun updateSettings(settings: PomodoroSettings) = timer.updateSettings(settings)
 
     fun finishSession() {
         val timerState = timer.state.value
@@ -91,7 +94,7 @@ class PomodoroViewModel(
                 _sessions.update {
                     it.copy(sessions = listOf(session) + it.sessions, saving = false)
                 }
-                timer.reset()
+                timer.advanceAfterFocus()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

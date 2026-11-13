@@ -40,6 +40,8 @@ object StudyCalendar {
 
     data class DayTask(val task: Task, val done: Boolean)
 
+    data class WeeklyGoalProgress(val done: Int, val goal: Int, val met: Boolean)
+
     fun dayKey(date: LocalDate): String = date.toString()
 
     fun parseDayKey(key: String): LocalDate = LocalDate.parse(key)
@@ -82,20 +84,61 @@ object StudyCalendar {
     fun taskEnd(task: Task): LocalDate? =
         ApiDates.localDateOrNull(task.endDate) ?: taskStart(task)
 
+    /** ISO weekday: 1 = segunda .. 7 = domingo. */
+    fun isoWeekday(date: LocalDate): Int = date.dayOfWeek.value
+
+    /**
+     * Se a tarefa está agendada para o dia. UNIQUE e DAILY ocupam todo o intervalo; WEEKLY segue
+     * os dias da semana escolhidos; MONTHLY cai no dia do mês (meses curtos usam o último dia);
+     * WEEKLY_GOAL pode ser concluída em qualquer dia do intervalo.
+     */
+    fun scheduledOn(task: Task, key: String): Boolean {
+        val day = parseDayKey(key)
+        taskStart(task)?.let { if (it.isAfter(day)) return false }
+        ApiDates.localDateOrNull(task.endDate)?.let { if (it.isBefore(day)) return false }
+        return when (task.type) {
+            TaskType.UNIQUE, TaskType.DAILY -> true
+            TaskType.WEEKLY -> isoWeekday(day) in task.recurrenceDays
+            TaskType.MONTHLY -> {
+                val configured = task.recurrenceDayOfMonth ?: return false
+                day.dayOfMonth == minOf(configured, day.lengthOfMonth())
+            }
+            TaskType.WEEKLY_GOAL -> true
+        }
+    }
+
+    /** Progresso da meta semanal na semana que contém [key] (segunda a domingo). */
+    fun weeklyGoalProgress(task: Task, key: String): WeeklyGoalProgress {
+        val goal = task.weeklyGoal ?: 1
+        val monday = startOfWeek(parseDayKey(key))
+        val from = dayKey(monday)
+        val to = dayKey(monday.plusDays(6))
+        val done = completionKeys(task).count { it in from..to }
+        return WeeklyGoalProgress(done = done, goal = goal, met = done >= goal)
+    }
+
+    /** Só dá para concluir/desfazer no dia quando ele faz parte da recorrência. */
+    fun canComplete(task: Task, key: String): Boolean =
+        task.type == TaskType.UNIQUE || scheduledOn(task, key)
+
     /**
      * - `UNIQUE` pendente ocupa todos os dias entre início e fim; concluída, ocupa só o dia de
      *   `completedDate` (tarefas antigas sem a data continuam ocupando o intervalo todo).
-     * - `DAILY` vale a partir do início e é concluída quando o dia está em `dailyCompletions`.
+     * - Recorrentes (DAILY/WEEKLY/MONTHLY) aparecem só nos dias agendados, concluídas quando o
+     *   dia está em `dailyCompletions`.
+     * - `WEEKLY_GOAL` aparece pendente em todos os dias da semana até a meta ser atingida; depois
+     *   disso sobram apenas os dias efetivamente concluídos, e a semana seguinte recomeça cheia.
      */
     fun tasksForDay(tasks: List<Task>, key: String, today: String): List<DayTask> {
         val day = parseDayKey(key)
         val result = ArrayList<DayTask>()
         for (task in tasks) {
             if (task.status == TaskStatus.DELETED) continue
-            if (task.type == TaskType.DAILY) {
-                val start = taskStart(task)
-                if (start != null && start.isAfter(day)) continue
-                result += DayTask(task, isCompletedOn(task, key, today))
+            if (task.type != TaskType.UNIQUE) {
+                if (!scheduledOn(task, key)) continue
+                val done = isCompletedOn(task, key, today)
+                if (task.type == TaskType.WEEKLY_GOAL && !done && weeklyGoalProgress(task, key).met) continue
+                result += DayTask(task, done)
                 continue
             }
             val from = taskStart(task) ?: continue
@@ -178,7 +221,7 @@ object StudyCalendar {
 
     fun isTaskDone(task: Task, today: String): Boolean {
         val reference = today.ifBlank { dayKey(LocalDate.now()) }
-        return if (task.type == TaskType.DAILY) {
+        return if (task.type != TaskType.UNIQUE) {
             isCompletedOn(task, reference, reference)
         } else {
             task.status == TaskStatus.DONE
