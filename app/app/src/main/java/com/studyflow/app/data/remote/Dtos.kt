@@ -79,6 +79,9 @@ data class TaskDto(
     val status: String? = null,
     val completed: Boolean? = null,
     val completedDate: String? = null,
+    val recurrenceDays: List<Int>? = null,
+    val recurrenceDayOfMonth: Int? = null,
+    val weeklyGoal: Int? = null,
     val projectId: String? = null,
     val stageId: String? = null,
     val dailyStatistics: DailyStatsDto? = null,
@@ -101,6 +104,9 @@ data class CreateTaskRequest(
     val type: String,
     val projectId: String? = null,
     val stageId: String? = null,
+    val recurrenceDays: List<Int>? = null,
+    val recurrenceDayOfMonth: Int? = null,
+    val weeklyGoal: Int? = null,
 )
 
 /**
@@ -117,6 +123,9 @@ data class UpdateTaskRequest(
     val completionDate: String? = null,
     val projectId: JsonElement? = null,
     val stageId: JsonElement? = null,
+    val recurrenceDays: List<Int>? = null,
+    val recurrenceDayOfMonth: Int? = null,
+    val weeklyGoal: Int? = null,
 )
 
 // ---------------------------------------------------------------------------

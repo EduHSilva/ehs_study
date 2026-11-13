@@ -8,7 +8,6 @@ object Routes {
     const val KANBAN = "kanban"
     const val PROJECTS = "projects"
     const val PROFILE = "profile"
-    const val REVIEW = "review"
     const val PROJECT_DETAIL = "project/{projectId}"
 
     fun projectDetail(id: String): String = "project/$id"

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
@@ -24,14 +25,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,9 +86,9 @@ fun PomodoroScreen() {
         item {
             ContentCard {
                 SegmentedToggle(
-                    options = listOf(s["focusMode"], s["breakMode"]),
-                    selectedIndex = if (state.breakMode) 1 else 0,
-                    onSelect = { index -> vm.setMode(index == 1) },
+                    options = listOf(s["focusMode"], s["breakMode"], s["longBreakMode"]),
+                    selectedIndex = state.mode.ordinal,
+                    onSelect = { index -> vm.setMode(TimerMode.entries[index]) },
                 )
                 Spacer(Modifier.height(28.dp))
                 Box(
@@ -91,7 +97,7 @@ fun PomodoroScreen() {
                 ) {
                     TimerRing(
                         seconds = state.timer.remainingSeconds,
-                        total = if (state.breakMode) BREAK_SECONDS else FOCUS_SECONDS,
+                        total = state.timer.durationSeconds,
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -106,7 +112,7 @@ fun PomodoroScreen() {
                                 text = s.format(
                                     "sessionCounter",
                                     "current" to state.sessionNumber,
-                                    "total" to 4,
+                                    "total" to state.settings.cycles,
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = StudyFlowTheme.colors.subtle,
@@ -116,19 +122,24 @@ fun PomodoroScreen() {
                 }
                 Spacer(Modifier.height(20.dp))
                 if (state.completed) {
+                    val completedKey = when (state.mode) {
+                        TimerMode.FOCUS -> "focusComplete"
+                        TimerMode.BREAK -> "breakComplete"
+                        TimerMode.LONG_BREAK -> "longBreakComplete"
+                    }
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            s[if (state.breakMode) "breakComplete" else "focusComplete"],
+                            s[completedKey],
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = StudyFlowTheme.colors.success,
                         )
                         Text(
-                            s[if (state.breakMode) "breakCompleteHint" else "registerFocusHint"],
+                            s[if (state.mode == TimerMode.FOCUS) "registerFocusHint" else "breakCompleteHint"],
                             style = MaterialTheme.typography.bodySmall,
                             color = StudyFlowTheme.colors.subtle,
                         )
@@ -145,6 +156,13 @@ fun PomodoroScreen() {
                         modifier = Modifier.weight(1f).height(42.dp),
                         shape = RoundedCornerShape(8.dp),
                     ) { Text(s["reset"]) }
+                    if (state.completed && state.mode != TimerMode.FOCUS) {
+                        Button(
+                            onClick = { vm.setMode(TimerMode.FOCUS) },
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(8.dp),
+                        ) { Text(s["backToFocus"]) }
+                    }
                     if (!state.completed) {
                         Button(
                             onClick = vm::toggleTimer,
@@ -152,7 +170,7 @@ fun PomodoroScreen() {
                             shape = RoundedCornerShape(8.dp),
                         ) { Text(if (state.running) s["pause"] else s["start"]) }
                     }
-                    if (state.focusStarted && !state.breakMode) {
+                    if (state.focusStarted && state.mode == TimerMode.FOCUS) {
                         Button(
                             onClick = vm::finishSession,
                             enabled = !state.saving,
@@ -176,6 +194,13 @@ fun PomodoroScreen() {
                     }
                 }
             }
+        }
+
+        item {
+            PomodoroSettingsCard(
+                settings = state.settings,
+                onChange = vm::updateSettings,
+            )
         }
 
         item {
@@ -234,12 +259,72 @@ fun PomodoroScreen() {
 }
 
 @Composable
+private fun PomodoroSettingsCard(settings: PomodoroSettings, onChange: (PomodoroSettings) -> Unit) {
+    val s = LocalStrings.current
+    ContentCard {
+        CardTitle(s["pomodoroSettingsTitle"])
+        Spacer(Modifier.height(14.dp))
+        NumberSettingField(
+            label = s["pomodoroFocusMinutes"],
+            value = settings.focusMinutes,
+            onChange = { onChange(settings.copy(focusMinutes = it)) },
+        )
+        Spacer(Modifier.height(10.dp))
+        NumberSettingField(
+            label = s["pomodoroBreakMinutes"],
+            value = settings.breakMinutes,
+            onChange = { onChange(settings.copy(breakMinutes = it)) },
+        )
+        Spacer(Modifier.height(10.dp))
+        NumberSettingField(
+            label = s["pomodoroLongBreakMinutes"],
+            value = settings.longBreakMinutes,
+            onChange = { onChange(settings.copy(longBreakMinutes = it)) },
+        )
+        Spacer(Modifier.height(10.dp))
+        NumberSettingField(
+            label = s["pomodoroCycles"],
+            value = settings.cycles,
+            onChange = { onChange(settings.copy(cycles = it)) },
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            s["pomodoroSettingsHint"],
+            style = MaterialTheme.typography.bodySmall,
+            color = StudyFlowTheme.colors.subtle,
+        )
+    }
+}
+
+@Composable
+private fun NumberSettingField(
+    label: String,
+    value: Int,
+    onChange: (Int) -> Unit,
+) {
+    var text by rememberSaveable(label) { mutableStateOf(value.toString()) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { raw ->
+            if (raw.length <= 3 && raw.all { it.isDigit() }) {
+                text = raw
+                raw.toIntOrNull()?.let(onChange)
+            }
+        },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
 private fun TimerRing(
     seconds: Int,
     total: Int,
     content: @Composable () -> Unit,
 ) {
-    val progress = ((total - seconds).toFloat() / total).coerceIn(0f, 1f)
+    val progress = if (total <= 0) 0f else ((total - seconds).toFloat() / total).coerceIn(0f, 1f)
     val track = StudyFlowTheme.colors.border
     val accent = MaterialTheme.colorScheme.primary
 

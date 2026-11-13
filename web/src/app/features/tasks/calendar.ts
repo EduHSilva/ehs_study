@@ -115,22 +115,71 @@ export function taskEnd(task: Task): Date | null {
   return parse(task.endDate) ?? taskStart(task)
 }
 
+// ISO weekday: 1 = segunda .. 7 = domingo.
+export function isoWeekday(date: Date): number {
+  return ((date.getDay() + 6) % 7) + 1
+}
+
+// Se a tarefa está agendada para o dia. UNIQUE e DAILY ocupam todo o intervalo; WEEKLY segue
+// os dias da semana escolhidos; MONTHLY cai no dia do mês (meses curtos usam o último dia);
+// WEEKLY_GOAL pode ser concluída em qualquer dia do intervalo.
+export function scheduledOn(task: Task, key: string): boolean {
+  const day = parseDayKey(key)
+  const start = taskStart(task)
+  if (start && startOfDay(start).getTime() > day.getTime()) return false
+  const end = parse(task.endDate)
+  if (end && startOfDay(end).getTime() < day.getTime()) return false
+  switch (task.type) {
+    case 'UNIQUE':
+    case 'DAILY':
+      return true
+    case 'WEEKLY':
+      return task.recurrenceDays.includes(isoWeekday(day))
+    case 'MONTHLY': {
+      const configured = task.recurrenceDayOfMonth
+      if (!configured) return false
+      const lastDay = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate()
+      return day.getDate() === Math.min(configured, lastDay)
+    }
+    case 'WEEKLY_GOAL':
+      return true
+  }
+}
+
+// Progresso da meta semanal na semana que contém `key` (segunda a domingo).
+export function weeklyGoalProgress(task: Task, key: string): { done: number; goal: number; met: boolean } {
+  const goal = task.weeklyGoal ?? 1
+  const monday = startOfWeek(parseDayKey(key))
+  const from = dayKey(monday)
+  const to = dayKey(addDays(monday, 6))
+  const done = completionKeys(task).filter(entry => entry >= from && entry <= to).length
+  return { done, goal, met: done >= goal }
+}
+
+// Só dá para concluir/desfazer no dia quando ele faz parte da recorrência.
+export function canComplete(task: Task, key: string): boolean {
+  return task.type === 'UNIQUE' || scheduledOn(task, key)
+}
+
 // Tarefas que valem para um dia, já com a conclusão apurada para aquele dia.
 //
 // - `UNIQUE` pendente ocupa todos os dias entre `startDate` e `endDate`; concluída, ocupa só o
 //   dia de `completedDate` (tarefas antigas sem a data continuam ocupando o intervalo todo).
-// - `DAILY` está agendada todos os dias a partir do início e concluída quando o dia está em
-//   `dailyCompletions` (o backend salva a conclusão dia a dia).
+// - Recorrentes (DAILY/WEEKLY/MONTHLY) aparecem só nos dias agendados, concluídas quando o dia
+//   está em `dailyCompletions`.
+// - `WEEKLY_GOAL` aparece pendente em todos os dias da semana até a meta ser atingida; depois
+//   disso sobram apenas os dias efetivamente concluídos, e a semana seguinte recomeça cheia.
 export function tasksForDay(tasks: Task[], key: string, today: string): DayTask[] {
   if (today === '') today = dayKey(new Date())
   const dayMs = parseDayKey(key).getTime()
   const result: DayTask[] = []
   for (const task of tasks) {
     if (task.status === 'DELETED') continue
-    if (task.type === 'DAILY') {
-      const start = taskStart(task)
-      if (start && startOfDay(start).getTime() > dayMs) continue
-      result.push({ task, done: isCompletedOn(task, key, today) })
+    if (task.type !== 'UNIQUE') {
+      if (!scheduledOn(task, key)) continue
+      const done = isCompletedOn(task, key, today)
+      if (task.type === 'WEEKLY_GOAL' && !done && weeklyGoalProgress(task, key).met) continue
+      result.push({ task, done })
       continue
     }
     const from = taskStart(task)
@@ -206,11 +255,11 @@ export function taskCoversDay(task: Task, key: string, today = ''): boolean {
   return tasksForDay([task], key, today).length > 0
 }
 
-// Conclusão de uma task no dia de referência. Para `DAILY` isso é o `dailyCompletions`; para
-// `UNIQUE`, o `status` (que vale para todos os dias do intervalo).
+// Conclusão de uma task no dia de referência. Para recorrentes isso é o `dailyCompletions`;
+// para `UNIQUE`, o `status` (que vale para todos os dias do intervalo).
 export function isTaskDone(task: Task, today = ''): boolean {
   const reference = today || dayKey(new Date())
-  if (task.type === 'DAILY') return isCompletedOn(task, reference, reference)
+  if (task.type !== 'UNIQUE') return isCompletedOn(task, reference, reference)
   return task.status === 'DONE'
 }
 

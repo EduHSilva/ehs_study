@@ -80,7 +80,6 @@ import com.studyflow.app.feature.pomodoro.PomodoroWidget
 import com.studyflow.app.feature.profile.ProfileScreen
 import com.studyflow.app.feature.projects.ProjectDetailScreen
 import com.studyflow.app.feature.projects.ProjectsScreen
-import com.studyflow.app.feature.review.ReviewScreen
 import com.studyflow.app.feature.tasks.TasksScreen
 import com.studyflow.app.ui.appViewModel
 import kotlinx.coroutines.launch
@@ -98,7 +97,6 @@ private val drawerDestinations = listOf(
     Destination(Routes.TASKS, Icons.Filled.Checklist, "tasks"),
     Destination(Routes.KANBAN, Icons.Filled.ViewKanban, "kanban"),
     Destination(Routes.PROJECTS, Icons.Filled.School, "projects"),
-    // Revisão ABNT ainda não tem endpoint no serviço study (ver TODO); oculto até existir.
     Destination(Routes.PROFILE, Icons.Filled.Person, "profile"),
 )
 
@@ -145,7 +143,6 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
         Routes.KANBAN -> s["kanban"]
         Routes.PROJECTS, Routes.PROJECT_DETAIL -> s["projectsTitle"]
         Routes.PROFILE -> s["profileTitle"]
-        Routes.REVIEW -> s["reviewTitle"]
         else -> s["dashboard"]
     }
 
@@ -253,7 +250,6 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
                         )
                     }
                     composable(Routes.PROFILE) { ProfileScreen() }
-                    composable(Routes.REVIEW) { ReviewScreen() }
                 }
                 if (route != Routes.POMODORO) {
                     PomodoroWidget(
@@ -288,7 +284,6 @@ private fun StudyFlowDrawer(
             BrandMark(dark = true)
             Spacer(Modifier.height(28.dp))
             drawerDestinations.forEach { destination ->
-                val disabled = destination.route == Routes.REVIEW
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -297,7 +292,7 @@ private fun StudyFlowDrawer(
                             if (currentRoute == destination.route) MaterialTheme.colorScheme.primary else Color.Transparent,
                             RoundedCornerShape(8.dp),
                         )
-                        .clickable(enabled = !disabled) { onNavigate(destination.route) }
+                        .clickable { onNavigate(destination.route) }
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -312,17 +307,9 @@ private fun StudyFlowDrawer(
                         s[destination.labelKey],
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (currentRoute == destination.route) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (disabled) colors.sidebarText.copy(alpha = 0.55f)
-                        else if (currentRoute == destination.route) Color.White else colors.sidebarText,
+                        color = if (currentRoute == destination.route) Color.White else colors.sidebarText,
                         modifier = Modifier.weight(1f),
                     )
-                    if (disabled) {
-                        Text(
-                            s["comingSoon"],
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.sidebarText.copy(alpha = 0.7f),
-                        )
-                    }
                 }
                 Spacer(Modifier.height(4.dp))
             }

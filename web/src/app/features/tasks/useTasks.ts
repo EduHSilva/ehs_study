@@ -4,8 +4,11 @@ import { useI18n } from '../../composables/useI18n'
 import { onSessionCacheReset } from '../../composables/useSessionCache'
 import { getProjectDetails, getProjects } from '../projects/projects.api'
 import { createTask, deleteTask, getTasksInRange, updateTask } from './tasks.api'
-import { buildCalendarGrid, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
+import { buildCalendarGrid, canComplete, dayKey, dayKeyFrom, parseDayKey, rangeFor, gridRangeFor, startOfDay, taskEnd, taskStart, taskCoversDay, isTaskDone, isCompletedOn, addDays, addMonths } from './calendar'
+import { buildTaskStats } from './taskStats'
+import type { TaskStats } from './taskStats'
 import { formatTaskList, isoToLocalInput, localInputToIso } from './taskFormat'
+import { isRecurringType } from './types'
 import type { Project, ProjectStage } from '../projects/types'
 import type { Task, TaskInput, TaskStatus, TaskType } from './types'
 
@@ -27,6 +30,7 @@ const total = ref(0)
 const error = ref<string | null>(null)
 const projectOptions = ref<Project[]>([])
 const stagesByProject = ref<Record<string, ProjectStage[]>>({})
+const projectFilter = ref('')
 let loaded = false
 let inFlight: Promise<void> | null = null
 let cacheEpoch = 0
@@ -46,6 +50,7 @@ onSessionCacheReset(() => {
   total.value = 0
   projectOptions.value = []
   stagesByProject.value = {}
+  projectFilter.value = ''
   loading.value = true
   error.value = null
 })
@@ -67,12 +72,20 @@ export function useTasks() {
   const startDate = ref('')
   const endDate = ref('')
   const type = ref<TaskType>('UNIQUE')
+  const recurrenceDays = ref<number[]>([])
+  const recurrenceDayOfMonth = ref<number | null>(null)
+  const weeklyGoal = ref<number | null>(null)
   const projectId = ref('')
   const stageId = ref('')
   const creating = ref(false)
   const updating = ref(false)
   const editingId = ref<string | null>(null)
   const formError = ref<string | null>(null)
+
+  const statsOpen = ref(false)
+  const statsLoading = ref(false)
+  const statsTasks = ref<TaskStats[]>([])
+  const statsError = ref<string | null>(null)
 
   const stages = computed(() => (projectId.value ? stagesByProject.value[projectId.value] ?? [] : []))
   const projectName = (task: Task) => projectOptions.value.find(project => project.id === task.projectId)?.title ?? ''
@@ -120,16 +133,23 @@ export function useTasks() {
   // usam o mesmo dia, senão a tela mostraria o estado de hoje enquanto o clique marcaria outro dia.
   const targetDay = computed(() => selectedDay.value ?? todayKey.value)
   const isDone = (task: Task) =>
-    (task.type === 'DAILY' && isCompletedOn(task, targetDay.value, todayKey.value)) ||
-    (task.type !== 'DAILY' && task.status === 'DONE')
+    isRecurringType(task.type)
+      ? isCompletedOn(task, targetDay.value, todayKey.value)
+      : task.status === 'DONE'
+  const canToggle = (task: Task) => canComplete(task, targetDay.value)
   const range = computed(() => rangeFor(anchor.value, mode.value))
   const gridRange = computed(() => gridRangeFor(anchor.value, mode.value))
-  const calendar = computed(() => buildCalendarGrid(periodTasks.value, anchor.value, mode.value, todayKey.value))
+  const visibleTasks = computed(() =>
+    projectFilter.value
+      ? periodTasks.value.filter(task => task.projectId === projectFilter.value)
+      : periodTasks.value
+  )
+  const calendar = computed(() => buildCalendarGrid(visibleTasks.value, anchor.value, mode.value, todayKey.value))
   const lastPage = computed(() => Math.max(0, Math.ceil(total.value / PAGE_SIZE) - 1))
   const canGoPrev = computed(() => page.value > 0)
   const canGoNext = computed(() => page.value < lastPage.value)
   const pendingCount = computed(() => items.value.filter(item => !isTaskDone(item, todayKey.value)).length)
-  const dailyCount = computed(() => items.value.filter(item => item.type === 'DAILY').length)
+  const recurringCount = computed(() => items.value.filter(item => isRecurringType(item.type)).length)
 
   const paginate = (all: Task[]) => {
     filteredTasks.value = all
@@ -156,15 +176,15 @@ export function useTasks() {
   const applyFilter = () => {
     const key = selectedDay.value
     if (key) {
-      paginate(periodTasks.value.filter(task => taskCoversDay(task, key, todayKey.value)))
+      paginate(visibleTasks.value.filter(task => taskCoversDay(task, key, todayKey.value)))
       return
     }
     const { from, to } = range.value
     const fromMs = startOfDay(from).getTime()
     const toMs = startOfDay(to).getTime()
-    paginate(periodTasks.value.filter(task => {
+    paginate(visibleTasks.value.filter(task => {
       if (task.status === 'DELETED') return false
-      if (task.type === 'DAILY') {
+      if (isRecurringType(task.type)) {
         const start = taskStart(task)
         return !start || startOfDay(start).getTime() <= toMs
       }
@@ -262,11 +282,19 @@ export function useTasks() {
     page.value = 0
   })
 
+  watch(projectFilter, () => {
+    page.value = 0
+    applyFilter()
+  })
+
   const resetForm = () => {
     title.value = ''
     startDate.value = ''
     endDate.value = ''
     type.value = 'UNIQUE'
+    recurrenceDays.value = []
+    recurrenceDayOfMonth.value = null
+    weeklyGoal.value = null
     projectId.value = ''
     stageId.value = ''
     formError.value = null
@@ -296,6 +324,9 @@ export function useTasks() {
     formError.value = null
     title.value = task.title
     type.value = task.type
+    recurrenceDays.value = [...task.recurrenceDays]
+    recurrenceDayOfMonth.value = task.recurrenceDayOfMonth
+    weeklyGoal.value = task.weeklyGoal
     startDate.value = isoToLocalInput(task.startDate)
     endDate.value = isoToLocalInput(task.endDate)
     projectId.value = task.projectId ?? ''
@@ -322,16 +353,44 @@ export function useTasks() {
       formError.value = t('taskRangeInverted')
       return false
     }
+    if (type.value === 'WEEKLY' && recurrenceDays.value.length === 0) {
+      formError.value = t('taskWeekdaysRequired')
+      return false
+    }
+    if (type.value === 'MONTHLY'
+      && (recurrenceDayOfMonth.value === null || recurrenceDayOfMonth.value < 1 || recurrenceDayOfMonth.value > 31)) {
+      formError.value = t('taskMonthDayRequired')
+      return false
+    }
+    if (type.value === 'WEEKLY_GOAL'
+      && (weeklyGoal.value === null || weeklyGoal.value < 1 || weeklyGoal.value > 7)) {
+      formError.value = t('taskWeeklyGoalRequired')
+      return false
+    }
     return true
   }
 
-  // Numa UNIQUE sem início explícito, o fim define o dia único. Numa DAILY o início é hoje,
+  const recurrenceFields = () => ({
+    recurrenceDays: type.value === 'WEEKLY' ? [...recurrenceDays.value].sort((a, b) => a - b) : null,
+    recurrenceDayOfMonth: type.value === 'MONTHLY' ? recurrenceDayOfMonth.value : null,
+    weeklyGoal: type.value === 'WEEKLY_GOAL' ? weeklyGoal.value : null
+  })
+
+  // Numa UNIQUE sem início explícito, o fim define o dia único. Nas recorrentes o início é hoje,
   // porque a recorrência passa a valer a partir do cadastro.
   const buildInput = (): TaskInput => {
     const end = localInputToIso(endDate.value)
     const link = projectId.value ? { projectId: projectId.value, stageId: stageId.value || null } : { projectId: null, stageId: null }
-    if (type.value === 'DAILY') {
-      return { title: title.value.trim(), startDate: localInputToIso(startDate.value) ?? new Date().toISOString(), endDate: end, type: 'DAILY', ...link }
+    const recurrence = recurrenceFields()
+    if (type.value !== 'UNIQUE') {
+      return {
+        title: title.value.trim(),
+        startDate: localInputToIso(startDate.value) ?? new Date().toISOString(),
+        endDate: end,
+        type: type.value,
+        ...link,
+        ...recurrence
+      }
     }
     const start = localInputToIso(startDate.value) ?? end
     return { title: title.value.trim(), startDate: start, endDate: end, type: 'UNIQUE', ...link }
@@ -371,7 +430,8 @@ export function useTasks() {
       type: type.value,
       startDate: localInputToIso(startDate.value),
       endDate: localInputToIso(endDate.value),
-      ...link
+      ...link,
+      ...recurrenceFields()
     }
   }
 
@@ -418,9 +478,13 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     // O back recusa `completionDate` futuro, e sem `startDate`/`endDate` recusa qualquer data
     // explícita. Nesses casos a conclusão cairia no dia atual, o que silenciosamente marcaria
     // outro dia do que o usuário escolheu — então avisamos em vez de mandar a chamada.
-    if (current.type === 'DAILY') {
+    if (isRecurringType(current.type)) {
       if (day > todayKey.value) {
         error.value = t('taskCompletionFuture')
+        return
+      }
+      if (!canComplete(current, day)) {
+        error.value = t('taskCompletionNotScheduled')
         return
       }
       // Sem intervalo o back só conclui o dia corrente, então marcar outro dia é impossível —
@@ -435,15 +499,15 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     const next = nextStatus(wasDone ? 'DONE' : 'PENDING')
     const previous = { ...current }
 
-    // Otimismo: numa DAILY o que muda é a lista de dias concluídos, porque é ela que pinta o
+    // Otimismo: numa recorrente o que muda é a lista de dias concluídos, porque é ela que pinta o
     // calendário. O back só aceita `completionDate` quando a task tem `startDate`/`endDate`
     // (sem intervalo ele rejeita qualquer data), então nesse caso deixa o dia corrente implícito.
     // Numa UNIQUE o dia vai como `completedDate`: concluída, o calendário mostra a task só ali.
-    const completionDate = current.type === 'DAILY' ? ((current.startDate || current.endDate) ? day : null) : day
+    const completionDate = isRecurringType(current.type) ? ((current.startDate || current.endDate) ? day : null) : day
     const optimistic: Task = {
       ...current,
       status: next,
-      completedDate: current.type === 'DAILY' ? current.completedDate : (next === 'DONE' ? day : null),
+      completedDate: isRecurringType(current.type) ? current.completedDate : (next === 'DONE' ? day : null),
       dailyStatistics: current.dailyStatistics
         ? { ...current.dailyStatistics, completedToday: next === 'DONE' && day === todayKey.value }
         : null,
@@ -457,8 +521,8 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     try {
       const saved = await updateTask({ id: current.id, status: next, completionDate })
       // A resposta do PUT vem sem `dailyCompletions` (só o detalhe as traz), então reaplicar ela
-      // apagaria o histórico. Numa DAILY recarrega a lista, que é onde o back devolve os dias.
-      if (current.type === 'DAILY') {
+      // apagaria o histórico. Numa recorrente recarrega a lista, que é onde o back devolve os dias.
+      if (isRecurringType(current.type)) {
         Object.assign(current, { ...saved, dailyCompletions: optimistic.dailyCompletions })
         periodTasks.value = periodTasks.value.map(task =>
           task.id === saved.id ? { ...saved, dailyCompletions: optimistic.dailyCompletions } : task
@@ -475,6 +539,28 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     } finally {
       savingId.value = null
     }
+  }
+
+  const loadStats = async () => {
+    statsLoading.value = true
+    statsError.value = null
+    try {
+      const to = startOfDay(new Date())
+      const from = addDays(to, -83) // últimas 12 semanas
+      const tasks = await getTasksInRange(from, to)
+      const filtered = projectFilter.value ? tasks.filter(task => task.projectId === projectFilter.value) : tasks
+      statsTasks.value = buildTaskStats(filtered, from, to, todayKey.value)
+    } catch {
+      statsError.value = t('taskStatsLoadFailed')
+      statsTasks.value = []
+    } finally {
+      statsLoading.value = false
+    }
+  }
+
+  const toggleStats = async () => {
+    statsOpen.value = !statsOpen.value
+    if (statsOpen.value) await loadStats()
   }
 
   const remove = async (id: string) => {
@@ -508,16 +594,20 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     deletingId,
     copied,
     pendingCount,
-    dailyCount,
+    recurringCount,
     anchor,
     mode,
     calendar,
     selectedDay,
+    projectFilter,
     formOpen,
     title,
     startDate,
     endDate,
     type,
+    recurrenceDays,
+    recurrenceDayOfMonth,
+    weeklyGoal,
     projectId,
     stageId,
     projectOptions,
@@ -531,6 +621,13 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     formError,
     todayKey,
     isDone,
+    canToggle,
+    statsOpen,
+    statsLoading,
+    statsTasks,
+    statsError,
+    toggleStats,
+    loadStats,
     load,
     refresh,
     goToPage,

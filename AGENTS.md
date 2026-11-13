@@ -73,8 +73,8 @@ Execute a partir de `app/` (projeto Gradle com o módulo `:app`, ou seja, `app/a
   tolerante), `domain/` (regras puras, testáveis na JVM), `di/AppContainer` (injeção manual).
 - `core/` guarda infra: `network` (OkHttp/Retrofit/envelope), `session`, `settings`, `prefs`,
   `i18n` e `ui` (tema + componentes).
-- Navegação com Navigation Compose (drawer + bottom bar). A tela de revisão existe, mas o item de
-  menu fica desabilitado com **EM BREVE**, igual ao web.
+- Navegação com Navigation Compose (drawer + bottom bar). A tela de revisão ABNT não está na
+  navegação (o endpoint dela não existe no backend), igual ao web.
 - Sessão: `SessionManager` persiste token + usuário em `SharedPreferences` nas mesmas chaves do web
   (`studyflow-auth`, `studyflow-theme`, `studyflow-locale`). Resposta `401` expira a sessão; chamadas
   de `/tasks` enviam `X-User-ID`.

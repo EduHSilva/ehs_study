@@ -50,7 +50,7 @@ class TasksRepository(private val api: TasksApi) {
         }
         return collected.filter { task ->
             if (task.status == TaskStatus.DELETED) return@filter false
-            if (task.type == TaskType.DAILY) {
+            if (task.type != TaskType.UNIQUE) {
                 val start = StudyCalendar.taskStart(task)
                 start == null || !start.isAfter(to)
             } else {
@@ -119,6 +119,9 @@ class TasksRepository(private val api: TasksApi) {
                 type = input.type.name,
                 projectId = input.projectId,
                 stageId = input.stageId,
+                recurrenceDays = input.recurrenceDays,
+                recurrenceDayOfMonth = input.recurrenceDayOfMonth,
+                weeklyGoal = input.weeklyGoal,
             ),
         ).unwrap()
         return Mappers.task(payload)
@@ -148,6 +151,9 @@ class TasksRepository(private val api: TasksApi) {
                 completionDate = update.completionDate,
                 projectId = projectId,
                 stageId = stageId,
+                recurrenceDays = update.recurrenceDays,
+                recurrenceDayOfMonth = update.recurrenceDayOfMonth,
+                weeklyGoal = update.weeklyGoal,
             ),
         ).unwrap()
         return Mappers.task(payload)

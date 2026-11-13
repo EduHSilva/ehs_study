@@ -2,7 +2,7 @@ package com.studyflow.app.data.model
 
 enum class TaskStatus { PENDING, WORKING, DONE, DELAYED, DELETED }
 
-enum class TaskType { UNIQUE, DAILY }
+enum class TaskType { UNIQUE, DAILY, WEEKLY, MONTHLY, WEEKLY_GOAL }
 
 data class DailyTaskStatistics(
     val scheduledDays: Int,
@@ -27,6 +27,12 @@ data class Task(
     // Dia em que uma tarefa UNIQUE foi concluída. Concluída, o calendário mostra a tarefa só
     // nesse dia; DAILY não usa (tem `dailyCompletions`).
     val completedDate: String? = null,
+    // Dias da semana (1 = segunda .. 7 = domingo) usados pela WEEKLY.
+    val recurrenceDays: List<Int> = emptyList(),
+    // Dia do mês (1..31) usado pela MONTHLY; meses mais curtos usam o último dia.
+    val recurrenceDayOfMonth: Int? = null,
+    // Conclusões esperadas por semana na WEEKLY_GOAL.
+    val weeklyGoal: Int? = null,
     val projectId: String? = null,
     val stageId: String? = null,
     val dailyStatistics: DailyTaskStatistics?,
@@ -40,6 +46,9 @@ data class TaskInput(
     val type: TaskType,
     val projectId: String? = null,
     val stageId: String? = null,
+    val recurrenceDays: List<Int>? = null,
+    val recurrenceDayOfMonth: Int? = null,
+    val weeklyGoal: Int? = null,
 )
 
 /**
@@ -57,6 +66,9 @@ data class TaskUpdate(
     val projectId: String? = null,
     val stageId: String? = null,
     val clearProjectLink: Boolean = false,
+    val recurrenceDays: List<Int>? = null,
+    val recurrenceDayOfMonth: Int? = null,
+    val weeklyGoal: Int? = null,
 )
 
 data class TaskPage(
