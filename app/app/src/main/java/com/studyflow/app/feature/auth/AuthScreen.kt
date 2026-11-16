@@ -348,7 +348,7 @@ fun BrandMark(dark: Boolean = false) {
             }
         }
         Text(
-            text = "StudyFlow",
+            text = "Estudos",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = if (dark) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onBackground,

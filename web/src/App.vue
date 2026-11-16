@@ -72,8 +72,8 @@ watchEffect(() => {
   if (typeof document === 'undefined') return
 
   document.title = isAuthenticated.value
-    ? `${pageTitles[currentPage.value] ?? 'Painel'} · EHS Study`
-    : 'EHS Study — Seus estudos, em fluxo'
+    ? `${pageTitles[currentPage.value] ?? 'Painel'} · Estudos`
+    : 'Estudos — Seus estudos, em fluxo'
 })
 </script>
 

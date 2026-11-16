@@ -45,7 +45,7 @@ const goLogin = () => {
 <template>
   <div class="landing">
     <header class="landing-header">
-      <div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>EHS Study</strong></div>
+      <div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>Estudos</strong></div>
       <div class="header-actions"><LanguageToggle /><ThemeToggle /></div>
     </header>
     <main class="landing-hero">
@@ -115,7 +115,7 @@ const goLogin = () => {
       </form>
     </main>
     <footer class="landing-footer">
-      <span>EHS Study © {{ new Date().getFullYear() }}</span>
+      <span>Estudos © {{ new Date().getFullYear() }} · Desenvolvido por EHS Solutions</span>
       <a href="/app/privacidade/">{{ t('privacyPolicy') }}</a>
     </footer>
   </div>
