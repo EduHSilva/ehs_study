@@ -14,11 +14,12 @@ const navItems: { key: AppPage; icon: string }[] = [
 
 <template>
   <aside class="sidebar">
-    <div><div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>EHS Study</strong></div>
+    <div><div class="brand"><span class="brand-icon"><img :src="asset('graduation-cap.svg')" alt="" /></span><strong>Estudos</strong></div>
       <nav><button v-for="item in navItems" :key="item.key" class="nav-item" :class="{ active: active === item.key }" @click="$emit('navigate', item.key)" @pointerenter="$emit('prefetch', item.key)" @focus="$emit('prefetch', item.key)"><img :src="item.icon" alt="" />{{ t(item.key) }}</button></nav></div>
     <div>
       <div class="profile"><img class="avatar" :src="avatarUrl" alt="" /><div><strong>{{ name }}</strong><span>{{ course }}</span></div></div>
       <button class="logout-btn" type="button" :disabled="pending" @click="logout">{{ t('logoutAction') }}</button>
+      <p class="brand-credit">Desenvolvido por EHS Solutions</p>
     </div>
   </aside>
 </template>

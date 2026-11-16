@@ -1,7 +1,13 @@
-# Regras de negócio — EHS Estudos (StudyFlow)
+# Regras de negócio — Estudos
 
 > Plataforma (auth, roles, isolamento): `D:/Projetos/ehs_microservices/regras-negocio.md`.
 > O produto usa dois serviços: `study` (projetos, notas, foco) e `tasks` (tarefas).
+
+## Marca
+
+- Nome exibido na web e no app: **Estudos**. O nome antigo "StudyFlow" não é mais usado
+  em UI (só o pacote interno `com.studyflow.app` e chaves de config mantêm o identificador).
+- Web (sidebar e landing) e app (drawer) exibem "Desenvolvido por EHS Solutions".
 
 ## Acesso
 
