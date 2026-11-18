@@ -178,3 +178,40 @@ test('cancelar a edição volta o formulário para o modo de criação', async (
   await expect(page.getByText('Editando tarefa')).toBeHidden()
   await expect(page.locator('.task-form').getByRole('button', { name: 'Adicionar tarefa' })).toBeVisible()
 })
+
+const dayKeyAt = (offset: number) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+test('estatística de recorrente sem prazo final conta os dias da janela', async ({ page }) => {
+  const start = new Date()
+  start.setDate(start.getDate() - 10)
+  const daily: MockTask = {
+    id: 'task-daily-stats',
+    title: 'Estudar diariamente',
+    createdDate: start.toISOString(),
+    startDate: start.toISOString(),
+    endDate: null,
+    type: 'DAILY',
+    status: 'PENDING',
+    projectId: null,
+    stageId: null,
+    dailyStatistics: null,
+    dailyCompletions: [
+      { completionDate: dayKeyAt(-5), completedAt: start.toISOString() },
+      { completionDate: dayKeyAt(-3), completedAt: start.toISOString() }
+    ]
+  }
+  await signIn(page)
+  await mockApi(page, { folders: [], tasks: [daily] })
+  await openTasks(page)
+
+  await page.getByRole('button', { name: 'Estatísticas' }).click()
+
+  const stats = page.locator('.task-stats-card')
+  await expect(stats).toContainText('Últimos 30 dias')
+  await expect(stats).toContainText('2 dia(s) concluído(s)')
+  await expect(stats).toContainText('8 dia(s) não concluído(s)')
+})

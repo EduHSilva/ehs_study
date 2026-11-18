@@ -39,6 +39,8 @@
 - A data de conclusão não pode estar no futuro nem fora do intervalo início/fim.
 - Data de início padrão = hoje. A listagem padrão cobre hoje até +7 dias.
 - A tarefa pode referenciar projeto/etapa (opcional, por UUID entre serviços).
+- "Prazo" na listagem/Kanban só aparece quando existe `endDate`; sem ele (recorrentes sem
+  fim) a tela mostra "Criado em" com `createdDate`.
 - Exclusão é soft delete (`DELETED`).
 
 ## Estatísticas de tarefas recorrentes
@@ -48,7 +50,8 @@
   `concluídos até hoje / dias agendados até hoje`.
 - `WEEKLY_GOAL`: avalia semanas fechadas (meta atingida = semana ok, senão falha) e mostra
   o progresso da semana corrente separadamente.
-- O painel considera as últimas 12 semanas e respeita o filtro por projeto.
+- O painel considera os últimos 30 dias e respeita o filtro por projeto. Numa recorrente sem
+  `endDate` a janela vai até hoje (o fim é aberto), então todos os dias desde o início contam.
 
 
 ## Projetos, etapas e versões
@@ -63,6 +66,9 @@
 ## Notas e foco
 
 - Pastas contêm notas (excluir a pasta remove as notas).
+- A nota pode mudar de pasta: `PUT /notes/{id}` aceita `folderId` opcional (validado como
+  pasta do mesmo usuário); no web a troca é por arrastar a nota até a pasta, no Android por
+  "Mover para…".
 - Sessões de foco registram título, minutos e data de conclusão.
 - O Pomodoro tem foco, intervalo e descanso longo configuráveis (minutos e ciclos). As
   preferências são salvas por aparelho (localStorage no web, SharedPreferences no Android)

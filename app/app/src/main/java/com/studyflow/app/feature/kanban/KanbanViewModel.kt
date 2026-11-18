@@ -29,6 +29,7 @@ data class KanbanUiState(
     val tasks: List<Task> = emptyList(),
     val projects: List<Project> = emptyList(),
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val errorKey: String? = null,
     val savingId: String? = null,
     val todayKey: String = LocalDate.now().toString(),
@@ -54,9 +55,13 @@ class KanbanViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true, errorKey = null) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 // As duas listas são carregadas juntas para a troca de aba ser instantânea e para os
                 // cartões de tarefa mostrarem o nome do projeto. Uma falha não derruba a outra.
@@ -83,7 +88,7 @@ class KanbanViewModel(
                     if (currentFailed) _state.update { it.copy(errorKey = "kanbanLoadFailed") }
                 }
             } finally {
-                _state.update { it.copy(loading = false) }
+                _state.update { it.copy(loading = false, refreshing = false) }
             }
         }
     }

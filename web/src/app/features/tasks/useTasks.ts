@@ -546,7 +546,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     statsError.value = null
     try {
       const to = startOfDay(new Date())
-      const from = addDays(to, -83) // últimas 12 semanas
+      const from = addDays(to, -29) // últimos 30 dias
       const tasks = await getTasksInRange(from, to)
       const filtered = projectFilter.value ? tasks.filter(task => task.projectId === projectFilter.value) : tasks
       statsTasks.value = buildTaskStats(filtered, from, to, todayKey.value)

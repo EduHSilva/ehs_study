@@ -53,6 +53,34 @@ class TaskFormatTest {
     }
 
     @Test
+    fun `task meta shows the due date when the task has an end`() {
+        val meta = TaskFormat.formatTaskMeta(
+            startDate = "2026-03-10T09:00:00",
+            endDate = "2026-03-12T18:00:00",
+            createdDate = "2026-03-01T08:00:00",
+            dueLabel = "Prazo:",
+            createdLabel = "Criado em {date}",
+            locale = ptBr,
+        )
+
+        assertEquals("Prazo: 10/03 → 12/03, 18:00", meta)
+    }
+
+    @Test
+    fun `task meta without an end falls back to the creation date`() {
+        val meta = TaskFormat.formatTaskMeta(
+            startDate = "2026-03-10T09:00:00",
+            endDate = null,
+            createdDate = "2026-03-01T08:00:00",
+            dueLabel = "Prazo:",
+            createdLabel = "Criado em {date}",
+            locale = ptBr,
+        )
+
+        assertEquals("Criado em 01/03, 08:00", meta)
+    }
+
+    @Test
     fun `task list copies each title as a checklist line`() {
         val list = TaskFormat.formatTaskList(listOf("Tarefa 1", "Tarefa 2"))
 

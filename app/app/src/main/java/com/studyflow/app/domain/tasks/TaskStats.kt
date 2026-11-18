@@ -37,7 +37,7 @@ object TaskStatsBuilder {
         for (task in tasks) {
             if (task.status == TaskStatus.DELETED || task.type == TaskType.UNIQUE) continue
             val start = StudyCalendar.taskStart(task) ?: continue
-            val end = StudyCalendar.taskEnd(task) ?: to
+            val end = ApiDates.localDateOrNull(task.endDate) ?: to
             val first = if (start.isAfter(from)) start else from
             val last = if (end.isBefore(to)) end else to
             if (first.isAfter(last)) continue

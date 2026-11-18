@@ -30,11 +30,12 @@ import java.time.LocalDateTime
 
 const val TASKS_PAGE_SIZE = 10
 
-private const val STATS_DAYS = 83L // últimas 12 semanas
+private const val STATS_DAYS = 29L // últimos 30 dias
 
 data class TasksUiState(
     val items: List<Task> = emptyList(),
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val pageLoading: Boolean = false,
     val calendarLoading: Boolean = false,
     val page: Int = 0,
@@ -129,6 +130,8 @@ class TasksViewModel(
     }
 
     fun refresh() {
+        if (_state.value.refreshing) return
+        _state.update { it.copy(refreshing = true) }
         viewModelScope.launch { refreshInternal() }
     }
 
@@ -143,7 +146,7 @@ class TasksViewModel(
         } catch (_: Exception) {
             _state.update { it.copy(errorKey = "tasksLoadFailed") }
         } finally {
-            _state.update { it.copy(pageLoading = false) }
+            _state.update { it.copy(pageLoading = false, refreshing = false) }
         }
     }
 

@@ -1,4 +1,4 @@
-import { addDays, dayKey, dayKeyFrom, parseDayKey, scheduledOn, startOfDay, startOfWeek, taskEnd, taskStart } from './calendar'
+import { addDays, dayKey, dayKeyFrom, explicitTaskEnd, parseDayKey, scheduledOn, startOfDay, startOfWeek, taskStart } from './calendar'
 import type { Task } from './types'
 
 export interface TaskStats {
@@ -44,7 +44,7 @@ export function buildTaskStats(tasks: Task[], from: Date, to: Date, today = ''):
     if (task.status === 'DELETED' || task.type === 'UNIQUE') continue
     const start = taskStart(task)
     if (!start) continue
-    const end = taskEnd(task) ?? to
+    const end = explicitTaskEnd(task) ?? to
     const first = later(start, from)
     const last = earlier(end, to)
     if (first.getTime() > last.getTime()) continue

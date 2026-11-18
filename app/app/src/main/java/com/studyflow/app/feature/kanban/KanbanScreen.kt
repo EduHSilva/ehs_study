@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.studyflow.app.core.i18n.LocalStrings
 import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LoadingScreen
+import com.studyflow.app.core.ui.components.RefreshableColumn
 import com.studyflow.app.core.ui.components.SegmentedToggle
 import com.studyflow.app.core.ui.components.Subtitle
 import com.studyflow.app.core.ui.components.Tag
@@ -132,7 +133,9 @@ fun KanbanScreen() {
             .fillMaxSize()
             .onGloballyPositioned { rootOffset = it.boundsInRoot().topLeft },
     ) {
-        Column(
+        RefreshableColumn(
+            isRefreshing = state.refreshing,
+            onRefresh = { vm.load(silent = true) },
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
@@ -482,11 +485,21 @@ private fun TaskCard(
                 }
             }
 
-            Text(
-                text = "${s["endDateLabel"]} ${TaskFormat.formatTaskPeriod(task.startDate, task.endDate, s.locale)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.subtle,
+            val meta = TaskFormat.formatTaskMeta(
+                startDate = task.startDate,
+                endDate = task.endDate,
+                createdDate = task.createdDate,
+                dueLabel = s["endDateLabel"],
+                createdLabel = s["createdAtLabel"],
+                locale = s.locale,
             )
+            if (meta.isNotEmpty()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.subtle,
+                )
+            }
             if (!projectName.isNullOrBlank()) {
                 Text(
                     text = projectName,
@@ -704,11 +717,21 @@ private fun DragOverlay(
                 overflow = TextOverflow.Ellipsis,
             )
             if (task != null) {
-                Text(
-                    text = "${s["endDateLabel"]} ${TaskFormat.formatTaskPeriod(task.startDate, task.endDate, s.locale)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.subtle,
+                val meta = TaskFormat.formatTaskMeta(
+                    startDate = task.startDate,
+                    endDate = task.endDate,
+                    createdDate = task.createdDate,
+                    dueLabel = s["endDateLabel"],
+                    createdLabel = s["createdAtLabel"],
+                    locale = s.locale,
                 )
+                if (meta.isNotEmpty()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.subtle,
+                    )
+                }
                 if (!projectName.isNullOrBlank()) {
                     Text(
                         text = projectName,

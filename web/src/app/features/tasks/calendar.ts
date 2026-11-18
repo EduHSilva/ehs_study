@@ -115,6 +115,12 @@ export function taskEnd(task: Task): Date | null {
   return parse(task.endDate) ?? taskStart(task)
 }
 
+// Fim explícito: só o `endDate`. Numa recorrente sem prazo o intervalo fica aberto, então as
+// estatísticas usam o fim da consulta em vez do dia de início.
+export function explicitTaskEnd(task: Task): Date | null {
+  return parse(task.endDate)
+}
+
 // ISO weekday: 1 = segunda .. 7 = domingo.
 export function isoWeekday(date: Date): number {
   return ((date.getDay() + 6) % 7) + 1

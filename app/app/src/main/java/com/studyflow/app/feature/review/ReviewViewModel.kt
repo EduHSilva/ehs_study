@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 data class ReviewUiState(
     val report: ReviewReport? = null,
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val errorKey: String? = null,
 )
 
@@ -28,16 +29,24 @@ class ReviewViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 val report = reviewRepository.getReport()
-                _state.update { it.copy(report = report, loading = false) }
+                _state.update {
+                    it.copy(report = report, loading = false, refreshing = false)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "reviewLoadFailed") }
+                _state.update {
+                    it.copy(loading = false, refreshing = false, errorKey = "reviewLoadFailed")
+                }
             }
         }
     }

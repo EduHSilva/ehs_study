@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -35,6 +34,7 @@ import com.studyflow.app.core.ui.components.CardTitle
 import com.studyflow.app.core.ui.components.ContentCard
 import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LoadingScreen
+import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.ProgressRing
 import com.studyflow.app.core.ui.components.SegmentedToggle
 import com.studyflow.app.core.ui.components.Subtitle
@@ -69,7 +69,9 @@ fun ReviewScreen() {
 
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
-    LazyColumn(
+    RefreshableLazyColumn(
+        isRefreshing = state.refreshing,
+        onRefresh = { vm.load(silent = true) },
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),

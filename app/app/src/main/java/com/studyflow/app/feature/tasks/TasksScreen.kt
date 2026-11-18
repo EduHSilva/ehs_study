@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +67,7 @@ import com.studyflow.app.core.ui.components.ContentCard
 import com.studyflow.app.core.ui.components.DateTimeField
 import com.studyflow.app.core.ui.components.EmptyNote
 import com.studyflow.app.core.ui.components.ErrorBanner
+import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.FieldLabel
 import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.PickerField
@@ -310,7 +310,9 @@ fun TasksScreen() {
     val pendingCount = state.items.count { !StudyCalendar.isTaskDone(it, state.todayKey) }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(
+        RefreshableLazyColumn(
+            isRefreshing = state.refreshing,
+            onRefresh = vm::refresh,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -836,7 +838,14 @@ private fun TaskRow(
         else -> ""
     }
     val meta = listOfNotNull(
-        "${s["endDateLabel"]} ${TaskFormat.formatTaskPeriod(task.startDate, task.endDate, s.locale)}",
+        TaskFormat.formatTaskMeta(
+            startDate = task.startDate,
+            endDate = task.endDate,
+            createdDate = task.createdDate,
+            dueLabel = s["endDateLabel"],
+            createdLabel = s["createdAtLabel"],
+            locale = s.locale,
+        ).ifBlank { null },
         listOfNotNull(projectName, stageName).joinToString(" · ").ifBlank { null },
         statsText.ifBlank { null },
     ).joinToString(" · ")

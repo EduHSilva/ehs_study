@@ -18,6 +18,7 @@ data class NotesUiState(
     val selectedFolderId: String? = null,
     val selectedNoteId: String? = null,
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val saving: Boolean = false,
     val errorKey: String? = null,
     val savedMessageKey: String? = null,
@@ -44,24 +45,36 @@ class NotesViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 val folders = notesRepository.getFolders()
-                val first = folders.firstOrNull()
-                _state.update {
-                    it.copy(
+                _state.update { current ->
+                    // Mantém a seleção atual quando ela ainda existe após a recarga.
+                    val folderId = current.selectedFolderId?.takeIf { id -> folders.any { it.id == id } }
+                        ?: folders.firstOrNull()?.id
+                    val folder = folders.firstOrNull { it.id == folderId }
+                    val noteId = current.selectedNoteId?.takeIf { id -> folder?.notes?.any { it.id == id } == true }
+                        ?: folder?.notes?.firstOrNull()?.id
+                    current.copy(
                         folders = folders,
-                        selectedFolderId = first?.id,
-                        selectedNoteId = first?.notes?.firstOrNull()?.id,
+                        selectedFolderId = folderId,
+                        selectedNoteId = noteId,
                         loading = false,
+                        refreshing = false,
                     )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "notesLoadFailed") }
+                _state.update {
+                    it.copy(loading = false, refreshing = false, errorKey = "notesLoadFailed")
+                }
             }
         }
     }
@@ -133,6 +146,40 @@ class NotesViewModel(
                 throw e
             } catch (_: Exception) {
                 _state.update { it.copy(errorKey = "noteCreateFailed") }
+            } finally {
+                _state.update { it.copy(saving = false) }
+            }
+        }
+    }
+
+    fun moveNote(noteId: String, targetFolderId: String) {
+        val current = _state.value
+        if (current.saving) return
+        val source = current.folders.firstOrNull { folder -> folder.notes.any { it.id == noteId } } ?: return
+        val note = source.notes.firstOrNull { it.id == noteId } ?: return
+        if (source.id == targetFolderId) return
+        viewModelScope.launch {
+            _state.update { it.copy(saving = true, errorKey = null, savedMessageKey = null) }
+            try {
+                notesRepository.saveNote(note.id, note.title, note.content, targetFolderId)
+                _state.update { state ->
+                    state.copy(
+                        folders = state.folders.map { folder ->
+                            when (folder.id) {
+                                source.id -> folder.copy(notes = folder.notes.filterNot { it.id == note.id })
+                                targetFolderId -> folder.copy(notes = folder.notes + note)
+                                else -> folder
+                            }
+                        },
+                        selectedFolderId = targetFolderId,
+                        selectedNoteId = note.id,
+                        savedMessageKey = "savedNow",
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(errorKey = "noteMoveFailed") }
             } finally {
                 _state.update { it.copy(saving = false) }
             }

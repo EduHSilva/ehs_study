@@ -171,6 +171,31 @@ export function useNotes() {
     }
   }
 
+  const moveNote = async (noteId: string, targetFolderId: string): Promise<boolean> => {
+    const source = folders.value.find(folder => folder.notes.some(note => note.id === noteId))
+    const note = source?.notes.find(item => item.id === noteId)
+    const target = folders.value.find(folder => folder.id === targetFolderId)
+    if (!source || !note || !target || source.id === target.id) return false
+    saving.value = true
+    error.value = null
+    try {
+      const saved = await saveNote(note.id, { title: note.title, content: note.content, folderId: target.id })
+      note.title = saved.title
+      note.content = saved.content
+      note.folderId = target.id
+      source.notes = source.notes.filter(item => item.id !== note.id)
+      target.notes.push(note)
+      selectedFolderId.value = target.id
+      selectedNoteId.value = note.id
+      return true
+    } catch {
+      error.value = t('noteMoveFailed')
+      return false
+    } finally {
+      saving.value = false
+    }
+  }
+
   const renameFolder = async (id: string, name: string) => {
     const folder = folders.value.find(item => item.id === id)
     if (!folder || !name.trim()) return false
@@ -184,5 +209,5 @@ export function useNotes() {
     }
   }
 
-  return { folders, folderNotes, selectedFolder, selectedNote, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, renameFolder }
+  return { folders, folderNotes, selectedFolder, selectedNote, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, moveNote, renameFolder }
 }

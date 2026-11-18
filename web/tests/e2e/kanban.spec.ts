@@ -120,6 +120,19 @@ test('tarefa diária não oferece a coluna de atrasadas', async ({ page }) => {
   await expect(status.locator('option[value="WORKING"]')).toHaveCount(1)
 })
 
+test('tarefa diária sem prazo mostra a data de criação em vez de prazo', async ({ page }) => {
+  const state = stateWithTasks()
+  const daily = state.tasks?.find(item => item.id === 'task-daily')
+  if (daily) daily.endDate = null
+  await signIn(page)
+  await mockApi(page, state)
+  await openKanban(page)
+
+  const card = taskColumn(page, 'Concluídas').locator('.kanban-card').filter({ hasText: 'Praticar exercícios' })
+  await expect(card).toContainText('Criado em')
+  await expect(card).not.toContainText('Prazo:')
+})
+
 test('recarrega a página mantendo o kanban aberto', async ({ page }) => {
   await signIn(page)
   await mockApi(page, stateWithTasks())

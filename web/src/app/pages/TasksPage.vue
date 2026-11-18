@@ -6,7 +6,7 @@ import ThemeToggle from '../components/ThemeToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
 import { useTasks } from '../features/tasks/useTasks'
-import { formatTaskPeriod } from '../features/tasks/taskFormat'
+import { formatEndDate, formatTaskPeriod } from '../features/tasks/taskFormat'
 import { parseDayKey, scheduledOn, weeklyGoalProgress } from '../features/tasks/calendar'
 import { isRecurringType } from '../features/tasks/types'
 import type { Task, TaskType } from '../features/tasks/types'
@@ -85,6 +85,11 @@ const dailyStats = (item: Task) => {
   }
   const count = item.dailyCompletions?.length ?? 0
   return count ? t('taskDailyDoneCount', { count }) : ''
+}
+// `Prazo` só existe quando há `endDate`; recorrentes sem fim mostram quando foram criadas.
+const taskPeriodLabel = (item: Task): string => {
+  if (item.endDate) return `${t('endDateLabel')} ${formatTaskPeriod(item.startDate, item.endDate)}`
+  return item.createdDate ? t('createdAtLabel', { date: formatEndDate(item.createdDate) }) : ''
 }
 </script>
 <template>
@@ -177,7 +182,7 @@ const dailyStats = (item: Task) => {
       </form>
       <p v-if="!items.length && !error" class="empty-note">{{ t('noTasks') }}</p>
       <div v-for="item in items" :key="item.id" class="task-line">
-        <button class="task-row" :disabled="savingId === item.id || !canToggle(item)" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatTaskPeriod(item.startDate, item.endDate) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="isRecurringType(item.type)" class="tag daily">{{ typeLabel(item.type) }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
+        <button class="task-row" :disabled="savingId === item.id || !canToggle(item)" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small v-if="taskPeriodLabel(item)">{{ taskPeriodLabel(item) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="isRecurringType(item.type)" class="tag daily">{{ typeLabel(item.type) }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
         <button class="task-edit" :aria-label="t('taskEditAction')" @click="startEdit(item)">✎</button>
         <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>
       </div>
