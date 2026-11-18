@@ -24,8 +24,8 @@ class NotesRepository(private val api: NotesApi) {
     suspend fun getFolders(): List<NoteFolder> =
         api.folders(page = 0, size = LIST_PAGE_SIZE).unwrap().items.orEmpty().map(Mappers::folder)
 
-    suspend fun saveNote(id: String, title: String, content: String): Note =
-        Mappers.note(api.saveNote(id, SaveNoteRequest(title, content)).unwrap(), null)
+    suspend fun saveNote(id: String, title: String, content: String, folderId: String? = null): Note =
+        Mappers.note(api.saveNote(id, SaveNoteRequest(title, content, folderId)).unwrap(), folderId)
 
     suspend fun createFolder(name: String): NoteFolder =
         Mappers.folder(api.createFolder(FolderRequest(name)).unwrap())

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -57,6 +56,7 @@ import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LinkButton
 import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.ProgressRing
+import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.Tag
 import com.studyflow.app.core.ui.theme.StudyFlowTheme
 import com.studyflow.app.data.model.ProjectStage
@@ -235,7 +235,9 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
         .mapIndexed { index, version -> Triple(index + 1, version, VersionDeadline.meta(version.dueDate)) }
         .sortedBy { it.third.sortValue }
 
-    LazyColumn(
+    RefreshableLazyColumn(
+        isRefreshing = state.refreshing,
+        onRefresh = { vm.load(silent = true) },
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),

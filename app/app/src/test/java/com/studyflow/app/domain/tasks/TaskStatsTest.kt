@@ -57,6 +57,29 @@ class TaskStatsTest {
     }
 
     @Test
+    fun `open ended daily counts every day up to the end of the range`() {
+        // Sem `endDate` a tarefa segue aberta: a janela termina no fim da consulta, não no início.
+        val daily = task(
+            TaskType.DAILY,
+            start = "2026-03-10T08:00:00",
+            end = null,
+            completions = listOf("2026-03-12", "2026-03-14"),
+        )
+
+        val stats = TaskStatsBuilder.build(
+            tasks = listOf(daily),
+            from = LocalDate.of(2026, 3, 2),
+            to = LocalDate.of(2026, 3, 15),
+            today = "2026-03-20",
+        ).single()
+
+        assertEquals(2, stats.completed)
+        assertEquals(4, stats.failed)
+        assertEquals(6, stats.scheduled)
+        assertEquals(33, stats.rate)
+    }
+
+    @Test
     fun `today is not counted as a failure yet`() {
         val daily = task(
             TaskType.DAILY,

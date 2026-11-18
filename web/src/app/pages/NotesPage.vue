@@ -6,7 +6,7 @@ import { useNotes } from '../features/notes/useNotes'
 
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t } = useI18n()
-const { folders, folderNotes, selectedFolder, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, renameFolder } = useNotes()
+const { folders, folderNotes, selectedFolder, loading, saving, error, selectedFolderId, selectedNoteId, load, selectFolder, selectNote, saveSelected, addFolder, addNote, removeSelectedNote, removeFolder, moveNote, renameFolder } = useNotes()
 onMounted(load)
 
 const saved = ref(t('savedEarlier')); const title = ref(''); const content = ref('')
@@ -58,6 +58,21 @@ const chooseNote = (id: string) => {
 }
 const beginRename = (folder: { id: string; name: string }) => { editingFolderId.value = folder.id; folderName.value = folder.name }
 const saveFolderName = async (id: string) => { if (await renameFolder(id, folderName.value)) editingFolderId.value = null }
+const draggingNoteId = ref<string | null>(null)
+const startNoteDrag = (id: string, event: DragEvent) => {
+  draggingNoteId.value = id
+  event.dataTransfer?.setData('text/plain', id)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+const dropNoteOnFolder = async (folderId: string) => {
+  const noteId = draggingNoteId.value
+  draggingNoteId.value = null
+  if (!noteId || !(await moveNote(noteId, folderId))) return
+  const note = folderNotes.value.find(item => item.id === noteId)
+  title.value = note?.title ?? ''
+  content.value = note?.content ?? ''
+  saved.value = t('savedNow')
+}
 </script>
 <template>
   <section class="content"><header class="page-header"><div><h1>{{ t('notesTitle') }}</h1><p>{{ t('notesSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
@@ -69,14 +84,14 @@ const saveFolderName = async (id: string) => { if (await renameFolder(id, folder
         <p v-if="!folders.length && !error" class="empty-note">{{ t('noFolders') }}</p>
         <div v-for="folder in folders" :key="folder.id" class="folder-row">
           <form v-if="editingFolderId===folder.id" class="folder-rename" @submit.prevent="saveFolderName(folder.id)"><input v-model="folderName" aria-label="Nome da pasta" maxlength="100"/><button class="link" type="submit">Salvar</button><button class="link" type="button" @click="editingFolderId=null">Cancelar</button></form>
-          <template v-else><button class="folder" :class="{selected:folder.id===selectedFolderId}" @click="chooseFolder(folder.id)">▰ <span class="folder-name">{{folder.name}}</span><small v-if="folder.notes.length" class="folder-count">{{ folder.notes.length }}</small></button><button class="link rename-folder" aria-label="Renomear pasta" @click="beginRename(folder)">✎</button></template>
+          <template v-else><button class="folder" :class="{selected:folder.id===selectedFolderId, 'drop-target': draggingNoteId !== null && folder.id !== selectedFolderId}" @click="chooseFolder(folder.id)" @dragover.prevent @drop.prevent="dropNoteOnFolder(folder.id)">▰ <span class="folder-name">{{folder.name}}</span><small v-if="folder.notes.length" class="folder-count">{{ folder.notes.length }}</small></button><button class="link rename-folder" aria-label="Renomear pasta" @click="beginRename(folder)">✎</button></template>
         </div>
         <button v-if="selectedFolderId" class="link danger folder-delete" @click="removeFolder(selectedFolderId)">{{ t('deleteFolderAction') }}</button>
       </article>
       <article class="card editor">
         <div class="card-title editor-heading"><div class="editor-title"><h2>{{ selectedFolder?.name ?? t('folderNotesTitle') }}</h2><small v-if="selectedFolder">{{ t('noteCount', { count: folderNotes.length }) }}</small></div><button v-if="selectedFolderId && !creatingNote" class="link" @click="beginCreateNote">＋ {{ t('newNote') }}</button></div>
         <nav v-if="selectedFolder && folderNotes.length" class="note-cards" :aria-label="t('folderNotesTitle')">
-          <button v-for="note in folderNotes" :key="note.id" class="note-card" :class="{selected:note.id===selectedNoteId && !creatingNote}" @click="chooseNote(note.id)">
+          <button v-for="note in folderNotes" :key="note.id" class="note-card" :class="{selected:note.id===selectedNoteId && !creatingNote, dragging: note.id === draggingNoteId}" draggable="true" :title="t('noteDragHint')" @click="chooseNote(note.id)" @dragstart="startNoteDrag(note.id, $event)" @dragend="draggingNoteId = null">
             <strong>{{ note.title || t('untitledNote') }}</strong>
             <small>{{ notePreview(note.content) || t('noNotePreview') }}</small>
             <span>{{ t('noteWordCount', { count: noteWordCount(note.content) }) }}</span>
@@ -116,6 +131,8 @@ const saveFolderName = async (id: string) => { if (await renameFolder(id, folder
 .note-card small{display:-webkit-box;overflow:hidden;color:var(--color-muted);font-size:12px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .note-card span{color:var(--color-subtle);font-size:11px}
 .note-card.selected span{color:var(--color-primary)}
+.note-card.dragging{opacity:.5}
+.folder.drop-target{border-color:var(--color-primary);background:var(--color-primary-soft)}
 .folder-notes-empty{margin:auto}
 .footer-actions{display:flex;align-items:center;gap:16px}
 .danger{color:var(--color-danger)}

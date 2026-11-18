@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -48,6 +48,7 @@ import com.studyflow.app.core.ui.components.ContentCard
 import com.studyflow.app.core.ui.components.EmptyNote
 import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LoadingScreen
+import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.Subtitle
 import com.studyflow.app.core.ui.theme.StudyFlowTheme
 import com.studyflow.app.domain.notes.NoteFormat
@@ -76,12 +77,14 @@ fun NotesScreen() {
     var renamingFolder by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmDeleteFolder by rememberSaveable { mutableStateOf(false) }
     var confirmDeleteNote by rememberSaveable { mutableStateOf(false) }
+    var movingNote by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.selectedNoteId) {
         val note = state.selectedNote
         title = note?.title.orEmpty()
         content = note?.content.orEmpty()
         creatingNote = false
+        movingNote = false
     }
 
     if (state.loading) {
@@ -169,8 +172,39 @@ fun NotesScreen() {
         )
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+    if (movingNote) {
+        val note = state.selectedNote
+        val targets = state.folders.filter { it.id != state.selectedFolderId }
+        AlertDialog(
+            onDismissRequest = { movingNote = false },
+            title = { Text(s["moveNoteAction"]) },
+            text = {
+                if (targets.isEmpty()) {
+                    Text(s["noOtherFolders"])
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        targets.forEach { folder ->
+                            TextButton(
+                                onClick = {
+                                    note?.let { vm.moveNote(it.id, folder.id) }
+                                    movingNote = false
+                                },
+                            ) { Text(folder.name) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { movingNote = false }) { Text(s["cancelAction"]) }
+            },
+        )
+    }
+
+    RefreshableLazyColumn(
+        isRefreshing = state.refreshing,
+        onRefresh = { vm.load(silent = true) },
+        modifier = Modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -356,6 +390,7 @@ fun NotesScreen() {
                             title = state.selectedNote?.title.orEmpty()
                             content = state.selectedNote?.content.orEmpty()
                         },
+                        onMove = null,
                         onDelete = null,
                         onSave = { vm.createNote(title, content) },
                     )
@@ -370,6 +405,7 @@ fun NotesScreen() {
                         canSave = !state.saving,
                         saving = state.saving,
                         onCancelCreate = null,
+                        onMove = { movingNote = true },
                         onDelete = { confirmDeleteNote = true },
                         onSave = { vm.saveSelected(title, content) },
                     )
@@ -446,6 +482,7 @@ private fun EditorBody(
     canSave: Boolean,
     saving: Boolean,
     onCancelCreate: (() -> Unit)?,
+    onMove: (() -> Unit)?,
     onDelete: (() -> Unit)?,
     onSave: () -> Unit,
 ) {
@@ -481,6 +518,9 @@ private fun EditorBody(
                 if (onCancelCreate != null) {
                     TextButton(onClick = onCancelCreate) { Text(s["cancelAction"]) }
                 } else if (onDelete != null) {
+                    if (onMove != null) {
+                        TextButton(onClick = onMove) { Text(s["moveNoteAction"]) }
+                    }
                     TextButton(onClick = onDelete) {
                         Text(s["deleteNoteAction"], color = StudyFlowTheme.colors.danger)
                     }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +37,7 @@ import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.LinkButton
 import com.studyflow.app.core.ui.components.LoadingScreen
 import com.studyflow.app.core.ui.components.ProgressRing
+import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.Tag
 import com.studyflow.app.core.ui.theme.StudyFlowTheme
 import com.studyflow.app.data.model.Task
@@ -84,7 +84,9 @@ fun DashboardScreen(onNavigate: (String) -> Unit, onOpenNote: (String) -> Unit) 
     val todayTasks = state.todayTasks
     val todayKey = java.time.LocalDate.now().toString()
 
-    LazyColumn(
+    RefreshableLazyColumn(
+        isRefreshing = state.refreshing,
+        onRefresh = { vm.load(silent = true) },
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = 20.dp,

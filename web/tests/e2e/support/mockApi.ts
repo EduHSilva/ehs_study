@@ -320,11 +320,21 @@ export async function mockApi(page: Page, state: MockState) {
 
     if (path.startsWith('/study/notes/') && method === 'PUT') {
       const id = path.split('/').pop()
-      const body = request.postDataJSON() as { title: string; content: string }
+      const body = request.postDataJSON() as { title: string; content: string; folderId?: string }
       const note = state.folders.flatMap(folder => folder.notes).find(item => item.id === id)
       if (note) {
         note.title = body.title
         note.content = body.content
+        if (body.folderId && body.folderId !== note.folderId) {
+          const target = state.folders.find(folder => folder.id === body.folderId)
+          if (target) {
+            state.folders.forEach(folder => {
+              folder.notes.splice(0, folder.notes.length, ...folder.notes.filter(item => item.id !== id))
+            })
+            note.folderId = target.id
+            target.notes.push(note)
+          }
+        }
       }
       return fulfill(route, note ?? null)
     }

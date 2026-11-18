@@ -43,7 +43,7 @@ export async function getFolders(): Promise<NoteFolder[]> {
   return (unwrap(res).items ?? []).map(toFolder)
 }
 
-export async function saveNote(id: string, patch: { title: string; content: string }): Promise<Note> {
+export async function saveNote(id: string, patch: { title: string; content: string; folderId?: string }): Promise<Note> {
   const payload = unwrap(
     await httpClient<DefaultResponse<NotePayload>>(`/study/notes/${id}`, { method: 'PUT', body: JSON.stringify(patch) })
   )

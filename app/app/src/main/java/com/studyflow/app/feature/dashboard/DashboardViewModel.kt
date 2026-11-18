@@ -29,6 +29,7 @@ data class DashboardUiState(
     val data: DashboardData? = null,
     val focus: FocusSession? = null,
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val errorKey: String? = null,
     val savingTaskId: String? = null,
 ) {
@@ -61,9 +62,13 @@ class DashboardViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 val (dashboard, sessions) = coroutineScope {
                     val dashboardDeferred = async { dashboardRepository.load() }
@@ -77,13 +82,16 @@ class DashboardViewModel(
                         data = dashboard,
                         focus = sessions.firstOrNull(),
                         loading = false,
+                        refreshing = false,
                         errorKey = null,
                     )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "dashboardLoadFailed") }
+                _state.update {
+                    it.copy(loading = false, refreshing = false, errorKey = "dashboardLoadFailed")
+                }
             }
         }
     }

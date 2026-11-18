@@ -7,7 +7,7 @@ import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
 import { useKanban } from '../features/kanban/useKanban'
 import type { ProjectColumn, TaskColumn } from '../features/kanban/useKanban'
-import { formatTaskPeriod } from '../features/tasks/taskFormat'
+import { formatEndDate, formatTaskPeriod } from '../features/tasks/taskFormat'
 import type { Project } from '../features/projects/types'
 import type { Task } from '../features/tasks/types'
 
@@ -120,7 +120,8 @@ const onProjectStatusChange = (id: string, event: Event) => {
               <strong :class="{ done: taskColumn(task) === 'DONE' }">{{ task.title }}</strong>
               <span v-if="task.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span>
             </header>
-            <p class="kanban-card-meta">{{ t('endDateLabel') }} {{ formatTaskPeriod(task.startDate, task.endDate) }}</p>
+            <p v-if="task.endDate" class="kanban-card-meta">{{ t('endDateLabel') }} {{ formatTaskPeriod(task.startDate, task.endDate) }}</p>
+            <p v-else-if="task.createdDate" class="kanban-card-meta">{{ t('createdAtLabel', { date: formatEndDate(task.createdDate) }) }}</p>
             <p v-if="projectName(task)" class="kanban-card-meta">{{ projectName(task) }}</p>
             <label class="kanban-status">
               <span>{{ t('kanbanTaskStatusLabel') }}</span>

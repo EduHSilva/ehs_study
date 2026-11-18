@@ -25,6 +25,20 @@ object TaskFormat {
         return "${dayStamp(start, locale)} → $end"
     }
 
+    /** `Prazo` só existe com `endDate`; recorrentes sem fim mostram a data de criação. */
+    fun formatTaskMeta(
+        startDate: String?,
+        endDate: String?,
+        createdDate: String?,
+        dueLabel: String,
+        createdLabel: String,
+        locale: Locale,
+    ): String = when {
+        !endDate.isNullOrBlank() -> "$dueLabel ${formatTaskPeriod(startDate, endDate, locale)}"
+        !createdDate.isNullOrBlank() -> createdLabel.replace("{date}", formatEndDate(createdDate, locale))
+        else -> ""
+    }
+
     /** Lista pronta para colar fora do app, no formato de checklist (`- [] título`). */
     fun formatTaskList(titles: List<String>): String = titles.joinToString("\n") { "- [] $it" }
 

@@ -22,6 +22,7 @@ import java.time.LocalDateTime
 data class ProjectsUiState(
     val projects: List<Project> = emptyList(),
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val savingProject: Boolean = false,
     val errorKey: String? = null,
     val newProjectId: String? = null,
@@ -38,16 +39,24 @@ class ProjectsViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 val projects = ProjectSorting.sort(projectsRepository.getProjects())
-                _state.update { it.copy(projects = projects, loading = false) }
+                _state.update {
+                    it.copy(projects = projects, loading = false, refreshing = false)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "projectsLoadFailed") }
+                _state.update {
+                    it.copy(loading = false, refreshing = false, errorKey = "projectsLoadFailed")
+                }
             }
         }
     }
@@ -87,6 +96,7 @@ data class ProjectDetailUiState(
     val details: ProjectDetails? = null,
     val tasks: List<Task> = emptyList(),
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val tasksLoading: Boolean = false,
     val errorKey: String? = null,
     val tasksErrorKey: String? = null,
@@ -112,16 +122,24 @@ class ProjectDetailViewModel(
         load()
     }
 
-    fun load() {
+    fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorKey = null) }
+            if (silent) {
+                _state.update { it.copy(refreshing = true) }
+            } else {
+                _state.update { it.copy(loading = true, errorKey = null) }
+            }
             try {
                 val details = projectsRepository.getProjectDetails(projectId)
-                _state.update { it.copy(details = details, loading = false) }
+                _state.update {
+                    it.copy(details = details, loading = false, refreshing = false)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _state.update { it.copy(loading = false, errorKey = "projectDetailsLoadFailed") }
+                _state.update {
+                    it.copy(loading = false, refreshing = false, errorKey = "projectDetailsLoadFailed")
+                }
                 return@launch
             }
             loadTasks()
@@ -139,7 +157,7 @@ class ProjectDetailViewModel(
             } catch (_: Exception) {
                 _state.update { it.copy(tasks = emptyList(), tasksErrorKey = "projectTasksLoadFailed") }
             } finally {
-                _state.update { it.copy(tasksLoading = false) }
+                _state.update { it.copy(tasksLoading = false, refreshing = false) }
             }
         }
     }

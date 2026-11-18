@@ -151,7 +151,7 @@ data class FolderDto(
 data class FolderPageDto(val items: List<FolderDto>? = null)
 
 @Serializable
-data class SaveNoteRequest(val title: String, val content: String)
+data class SaveNoteRequest(val title: String, val content: String, val folderId: String? = null)
 
 @Serializable
 data class FolderRequest(val name: String)
