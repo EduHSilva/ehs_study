@@ -107,9 +107,13 @@ async function initAuth(): Promise<void> {
   if (!stored) return
   try {
     const fresh = await meRequest()
-    // `/users/auth/me` não tem schema documentado; se não devolver `id`, preserva o
-    // que veio do login — sem ele o header X-User-ID some e a listagem de tasks volta vazia.
-    session.value = { token: stored.token, user: { ...fresh.user, id: fresh.user.id || stored.user.id } }
+    // `/users/auth/me` renova o token (expiração deslizante). Se não devolver `id`,
+    // preserva o do login — sem ele o header X-User-ID some e a listagem de tasks
+    // volta vazia.
+    session.value = {
+      token: fresh.token || stored.token,
+      user: { ...fresh.user, id: fresh.user.id || stored.user.id }
+    }
     persistSession(session.value)
   } catch {
     doLogout()
