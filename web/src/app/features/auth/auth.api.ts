@@ -39,7 +39,7 @@ export async function loginWithGoogle(idToken: string): Promise<AuthSession> {
 export async function me(): Promise<AuthSession> {
   const res = await httpClient<DefaultResponse<LoginPayload>>('/users/auth/me')
   const payload = unwrap(res)
-  return { token: '', user: toAuthUser(payload) }
+  return { token: payload.token ?? '', user: toAuthUser(payload) }
 }
 
 export async function register(input: RegisterInput): Promise<RegisterPayload> {

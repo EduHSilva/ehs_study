@@ -43,8 +43,9 @@ class AuthRepository(
     }
 
     /**
-     * Revalida a sessão salva no início do app. `/users/auth/me` não tem schema documentado:
-     * se não devolver `id`, preserva o do login (sem ele o `X-User-ID` some e as tasks vêm vazias).
+     * Revalida a sessão salva no início do app. `/users/auth/me` devolve um token
+     * renovado (expiração deslizante); se não devolver `id`, preserva o do login — sem
+     * ele o `X-User-ID` some e as tasks vêm vazias.
      */
     suspend fun initAuth() {
         val stored = sessionManager.session.value ?: return
@@ -52,7 +53,7 @@ class AuthRepository(
             val fresh = api.me().unwrap()
             sessionManager.save(
                 AuthSession(
-                    token = stored.token,
+                    token = fresh.token?.takeIf { it.isNotBlank() } ?: stored.token,
                     user = toUser(fresh).copy(id = fresh.id.ifBlank { stored.user.id }),
                 ),
             )
