@@ -114,6 +114,7 @@ class TasksRepository(private val api: TasksApi) {
         val payload = api.create(
             CreateTaskRequest(
                 title = input.title,
+                details = input.details,
                 startDate = input.startDate,
                 endDate = input.endDate,
                 type = input.type.name,
@@ -144,6 +145,7 @@ class TasksRepository(private val api: TasksApi) {
             id,
             UpdateTaskRequest(
                 title = update.title,
+                details = update.details,
                 type = update.type?.name,
                 startDate = update.startDate,
                 endDate = update.endDate,

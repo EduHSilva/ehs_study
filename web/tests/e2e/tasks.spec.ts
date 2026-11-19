@@ -26,6 +26,7 @@ const now = new Date()
 const TASK: MockTask = {
   id: 'task-1',
   title: 'Revisar capítulo 2',
+  details: 'Gravar aula: https://example.com/aula-1',
   createdDate: now.toISOString(),
   startDate: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
   endDate: new Date(now.getTime() + 2 * 86_400_000).toISOString(),
@@ -63,24 +64,39 @@ test('edita a tarefa incluindo projeto e etapa', async ({ page }) => {
 
   const form = page.locator('.task-form')
   await expect(form.getByLabel('Título da tarefa')).toHaveValue(TASK.title)
-  await expect(form.getByLabel('Projeto')).toHaveValue('project-1')
+  await expect(form.getByLabel('Detalhes')).toHaveValue(TASK.details)
+  await expect(form.getByLabel('Projeto ou curso')).toHaveValue('project-1')
   await expect(form.getByLabel('Etapa')).toHaveValue('stage-1')
 
   await form.getByLabel('Título da tarefa').fill('Revisar capítulo 3')
-  await form.getByLabel('Projeto').selectOption('project-2')
+  await form.getByLabel('Detalhes').fill('Aula 2: https://example.com/aula-2')
+  await form.getByLabel('Projeto ou curso').selectOption('project-2')
   await expect(form.getByLabel('Etapa')).toHaveValue('')
   await form.getByLabel('Etapa').selectOption('stage-2')
   await form.getByRole('button', { name: 'Salvar alterações' }).click()
 
   await expect.poll(() => state.tasks?.[0]).toMatchObject({
     title: 'Revisar capítulo 3',
+    details: 'Aula 2: https://example.com/aula-2',
     projectId: 'project-2',
     stageId: 'stage-2'
   })
   await expect(page.locator('.task-row')).toContainText('Revisar capítulo 3')
   await expect(page.locator('.task-row')).toContainText('Projeto Beta')
   await expect(page.locator('.task-row')).toContainText('Metodologia')
+  await expect(page.locator('.task-detail')).toContainText('Aula 2:')
   await expect(page.locator('.task-form')).toBeHidden()
+})
+
+test('mostra os detalhes da tarefa com o link clicável', async ({ page }) => {
+  await signIn(page)
+  await mockApi(page, stateWithTask())
+  await openTasks(page)
+
+  const detail = page.locator('.task-detail')
+  await expect(detail).toContainText('Gravar aula:')
+  await expect(detail.getByRole('link', { name: 'https://example.com/aula-1' }))
+    .toHaveAttribute('href', 'https://example.com/aula-1')
 })
 
 test('tarefa única concluída aparece só no dia da execução no calendário', async ({ page }) => {

@@ -71,6 +71,7 @@ object Mappers {
         return Task(
             id = dto.id ?: fallbackId ?: "",
             title = dto.title.orEmpty(),
+            details = dto.details,
             createdDate = dto.createdDate,
             startDate = dto.startDate,
             endDate = endDate,

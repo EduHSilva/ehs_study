@@ -28,6 +28,7 @@ interface TaskPayload {
   id: string
   createdDate?: string | null
   title: string
+  details?: string | null
   startDate?: string | null
   endDate?: string | null
   type?: string | null
@@ -97,6 +98,7 @@ function toTask(payload: TaskPayload): Task {
   return {
     id: payload.id,
     title: payload.title,
+    details: payload.details ?? null,
     createdDate: payload.createdDate ?? null,
     startDate: payload.startDate ?? null,
     endDate: payload.endDate ?? null,
@@ -214,6 +216,7 @@ export async function createTask(input: TaskInput): Promise<Task> {
     headers: taskHeaders(),
     body: JSON.stringify({
       title: input.title,
+      details: input.details ?? null,
       startDate: input.startDate,
       endDate: input.endDate,
       type: input.type,
@@ -231,6 +234,7 @@ export async function createTask(input: TaskInput): Promise<Task> {
 export async function updateTask(input: TaskUpdate & { id: string }): Promise<Task> {
   const body: Record<string, unknown> = {}
   if (input.title !== undefined) body.title = input.title
+  if (input.details !== undefined) body.details = input.details
   if (input.type !== undefined) body.type = input.type
   if (input.startDate !== undefined) body.startDate = input.startDate
   if (input.endDate !== undefined) body.endDate = input.endDate

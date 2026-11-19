@@ -32,7 +32,7 @@ const pageTitles: Record<string, string> = {
   notes: 'Notas',
   tasks: 'Tarefas',
   kanban: 'Kanban',
-  projects: 'Projetos',
+  projects: 'Projetos e cursos',
   review: 'Revisão',
   profile: 'Perfil'
 }

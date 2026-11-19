@@ -69,6 +69,7 @@ export function useTasks() {
 
   const formOpen = ref(false)
   const title = ref('')
+  const details = ref('')
   const startDate = ref('')
   const endDate = ref('')
   const type = ref<TaskType>('UNIQUE')
@@ -289,6 +290,7 @@ export function useTasks() {
 
   const resetForm = () => {
     title.value = ''
+    details.value = ''
     startDate.value = ''
     endDate.value = ''
     type.value = 'UNIQUE'
@@ -323,6 +325,7 @@ export function useTasks() {
     editingId.value = task.id
     formError.value = null
     title.value = task.title
+    details.value = task.details ?? ''
     type.value = task.type
     recurrenceDays.value = [...task.recurrenceDays]
     recurrenceDayOfMonth.value = task.recurrenceDayOfMonth
@@ -382,9 +385,11 @@ export function useTasks() {
     const end = localInputToIso(endDate.value)
     const link = projectId.value ? { projectId: projectId.value, stageId: stageId.value || null } : { projectId: null, stageId: null }
     const recurrence = recurrenceFields()
+    const detailsValue = details.value.trim() || null
     if (type.value !== 'UNIQUE') {
       return {
         title: title.value.trim(),
+        details: detailsValue,
         startDate: localInputToIso(startDate.value) ?? new Date().toISOString(),
         endDate: end,
         type: type.value,
@@ -393,7 +398,7 @@ export function useTasks() {
       }
     }
     const start = localInputToIso(startDate.value) ?? end
-    return { title: title.value.trim(), startDate: start, endDate: end, type: 'UNIQUE', ...link }
+    return { title: title.value.trim(), details: detailsValue, startDate: start, endDate: end, type: 'UNIQUE', ...link }
   }
 
   const create = async (): Promise<boolean> => {
@@ -427,6 +432,8 @@ export function useTasks() {
     const link = projectId.value ? { projectId: projectId.value, stageId: stageId.value || null } : { projectId: null, stageId: null }
     return {
       title: title.value.trim(),
+      // String vazia limpa os detalhes no back; omitir manteria o valor atual.
+      details: details.value.trim(),
       type: type.value,
       startDate: localInputToIso(startDate.value),
       endDate: localInputToIso(endDate.value),
@@ -602,6 +609,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     projectFilter,
     formOpen,
     title,
+    details,
     startDate,
     endDate,
     type,

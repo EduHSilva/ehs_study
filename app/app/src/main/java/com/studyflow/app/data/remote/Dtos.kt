@@ -70,6 +70,7 @@ data class DailyCompletionDto(
 data class TaskDto(
     val id: String? = null,
     val title: String? = null,
+    val details: String? = null,
     val createdDate: String? = null,
     val startDate: String? = null,
     val endDate: String? = null,
@@ -99,6 +100,7 @@ data class TaskPageDto(
 @Serializable
 data class CreateTaskRequest(
     val title: String,
+    val details: String? = null,
     val startDate: String? = null,
     val endDate: String? = null,
     val type: String,
@@ -116,6 +118,7 @@ data class CreateTaskRequest(
 @Serializable
 data class UpdateTaskRequest(
     val title: String? = null,
+    val details: String? = null,
     val type: String? = null,
     val startDate: String? = null,
     val endDate: String? = null,
