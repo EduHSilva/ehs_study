@@ -151,7 +151,7 @@ test('aba de projetos move o projeto entre pendente, em andamento e concluídos'
   await mockApi(page, state)
   await openKanban(page)
 
-  await page.locator('.kanban-switch').getByRole('button', { name: 'Projetos' }).click()
+  await page.locator('.kanban-switch').getByRole('button', { name: 'Projetos e cursos' }).click()
   const waiting = projectColumn(page, 'Pendentes')
   const working = projectColumn(page, 'Em andamento')
   const done = projectColumn(page, 'Concluídos')
@@ -159,12 +159,12 @@ test('aba de projetos move o projeto entre pendente, em andamento e concluídos'
   await expect(done.getByText('Iniciação científica')).toBeVisible()
 
   const card = waiting.locator('.kanban-card').filter({ hasText: 'TCC de História' })
-  await card.getByLabel('Status do projeto').selectOption('WORKING')
+  await card.getByLabel('Status do projeto ou curso').selectOption('WORKING')
   await expect.poll(() => (state.projects?.find(item => (item as { id?: string }).id === 'project-a') as { status?: string } | undefined)?.status).toBe('WORKING')
   await expect(working.getByText('TCC de História')).toBeVisible()
 
   await working.locator('.kanban-card').filter({ hasText: 'TCC de História' })
-    .getByLabel('Status do projeto').selectOption('DONE')
+    .getByLabel('Status do projeto ou curso').selectOption('DONE')
   await expect.poll(() => (state.projects?.find(item => (item as { id?: string }).id === 'project-a') as { status?: string } | undefined)?.status).toBe('DONE')
   await expect(done.getByText('TCC de História')).toBeVisible()
   await expect(working.getByText('TCC de História')).toHaveCount(0)

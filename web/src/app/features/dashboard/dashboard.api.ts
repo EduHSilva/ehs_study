@@ -30,6 +30,7 @@ function toTask(raw: unknown, index: number): Task | null {
   return {
     id: typeof item.id === 'string' ? item.id : `dashboard-task-${index}`,
     title: typeof item.title === 'string' ? item.title : '',
+    details: typeof item.details === 'string' ? item.details : null,
     createdDate,
     startDate,
     endDate: endDate ?? legacyDate ?? schedule,

@@ -340,6 +340,7 @@ class TasksViewModel(
 
     fun submitForm(
         title: String,
+        details: String,
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
@@ -348,9 +349,9 @@ class TasksViewModel(
         weeklyGoal: Int?,
     ) {
         if (_state.value.editingId != null) {
-            saveEdit(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
+            saveEdit(title, details, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
         } else {
-            create(title, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
+            create(title, details, start, end, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal)
         }
     }
 
@@ -387,6 +388,7 @@ class TasksViewModel(
 
     private fun create(
         title: String,
+        details: String,
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
@@ -406,9 +408,11 @@ class TasksViewModel(
                 val endIso = end?.let(ApiDates::toIso)
                 val linkProject = current.formProjectId
                 val linkStage = current.formProjectId?.let { current.formStageId }
+                val detailsValue = details.trim().ifEmpty { null }
                 val input = if (type != TaskType.UNIQUE) {
                     TaskInput(
                         title = title.trim(),
+                        details = detailsValue,
                         startDate = start?.let(ApiDates::toIso) ?: Instant.now().toString(),
                         endDate = endIso,
                         type = type,
@@ -421,6 +425,7 @@ class TasksViewModel(
                 } else {
                     TaskInput(
                         title = title.trim(),
+                        details = detailsValue,
                         startDate = start?.let(ApiDates::toIso) ?: endIso,
                         endDate = endIso,
                         type = TaskType.UNIQUE,
@@ -463,6 +468,7 @@ class TasksViewModel(
     // vínculo com projeto/etapa é sempre enviado — null explícito desvincula, como no web.
     private fun saveEdit(
         title: String,
+        details: String,
         start: LocalDateTime?,
         end: LocalDateTime?,
         type: TaskType,
@@ -488,6 +494,8 @@ class TasksViewModel(
                     task.id,
                     TaskUpdate(
                         title = title.trim(),
+                        // String vazia limpa os detalhes no back; null manteria o valor atual.
+                        details = details.trim(),
                         type = type,
                         startDate = start?.let(ApiDates::toIso),
                         endDate = end?.let(ApiDates::toIso),

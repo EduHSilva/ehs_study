@@ -39,6 +39,9 @@
 - A data de conclusão não pode estar no futuro nem fora do intervalo início/fim.
 - Data de início padrão = hoje. A listagem padrão cobre hoje até +7 dias.
 - A tarefa pode referenciar projeto/etapa (opcional, por UUID entre serviços).
+- Detalhes: texto livre (até 2000 caracteres) para anotações e links de aulas; a listagem
+  mostra até 3 linhas e URLs `http(s)` viram links clicáveis no web e no app. Enviar texto
+  vazio na edição limpa o campo; omitir o campo mantém o valor.
 - "Prazo" na listagem/Kanban só aparece quando existe `endDate`; sem ele (recorrentes sem
   fim) a tela mostra "Criado em" com `createdDate`.
 - Exclusão é soft delete (`DELETED`).
@@ -54,9 +57,11 @@
   `endDate` a janela vai até hoje (o fim é aberto), então todos os dias desde o início contam.
 
 
-## Projetos, etapas e versões
+## Projetos e cursos, etapas e versões
 
-- Projeto tem título, status, orientador, etapas e versões.
+- O mesmo cadastro atende projetos e cursos; não há campo de tipo e os textos da UI dizem
+  "projeto ou curso".
+- Projeto ou curso tem título, status, orientador, etapas e versões.
 - Etapa tem nome e "concluída"; o progresso do projeto é o percentual de etapas
   concluídas (inteiro; 0 quando não há etapas).
 - Versão tem título e prazo; no app Android o prazo é sinalizado como `OVERDUE` quando já

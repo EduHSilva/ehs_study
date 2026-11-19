@@ -25,6 +25,8 @@ export interface DailyTaskCompletion {
 export interface Task {
   id: string
   title: string
+  // Texto livre com anotações e links (ex.: gravações de aula). Nulo quando não há detalhes.
+  details: string | null
   createdDate: string | null
   startDate: string | null
   endDate: string | null
@@ -47,6 +49,7 @@ export interface Task {
 
 export interface TaskInput {
   title: string
+  details?: string | null
   startDate: string | null
   endDate: string | null
   type: TaskType
@@ -62,6 +65,7 @@ export interface TaskInput {
 // recorrência está sendo concluído ou desfeito; sem ele o back usa o dia atual.
 export interface TaskUpdate {
   title?: string
+  details?: string | null
   type?: TaskType
   startDate?: string | null
   endDate?: string | null

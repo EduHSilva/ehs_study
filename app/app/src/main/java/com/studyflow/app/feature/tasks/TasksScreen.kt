@@ -54,11 +54,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.studyflow.app.core.i18n.LocalStrings
@@ -97,6 +103,11 @@ private val TASK_TYPES = listOf(
     TaskType.WEEKLY_GOAL,
 )
 
+private const val MAX_DETAILS_LENGTH = 2000
+
+// Mesmo formato aceito pelo web: só http(s) vira link, pontuação final fica fora da URL.
+private val DETAILS_URL_REGEX = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen() {
@@ -117,6 +128,7 @@ fun TasksScreen() {
     }
 
     var title by rememberSaveable { mutableStateOf("") }
+    var details by rememberSaveable { mutableStateOf("") }
     var typeName by rememberSaveable { mutableStateOf(TaskType.UNIQUE.name) }
     var startDate by remember { mutableStateOf<LocalDateTime?>(null) }
     var endDate by remember { mutableStateOf<LocalDateTime?>(null) }
@@ -132,6 +144,7 @@ fun TasksScreen() {
     LaunchedEffect(state.formOpen) {
         if (!state.formOpen) {
             title = ""
+            details = ""
             typeName = TaskType.UNIQUE.name
             startDate = null
             endDate = null
@@ -144,6 +157,7 @@ fun TasksScreen() {
     LaunchedEffect(state.editingId) {
         val task = state.editingTask ?: return@LaunchedEffect
         title = task.title
+        details = task.details.orEmpty()
         typeName = task.type.name
         startDate = ApiDates.localDateTimeOrNull(task.startDate)
         endDate = ApiDates.localDateTimeOrNull(task.endDate)
@@ -189,6 +203,15 @@ fun TasksScreen() {
                     label = { Text(s["taskTitleLabel"]) },
                     placeholder = { Text(s["taskTitlePlaceholder"]) },
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = details,
+                    onValueChange = { details = it.take(MAX_DETAILS_LENGTH) },
+                    label = { Text(s["taskDetailsLabel"]) },
+                    placeholder = { Text(s["taskDetailsPlaceholder"]) },
+                    minLines = 3,
+                    maxLines = 6,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 PickerField(
@@ -269,6 +292,7 @@ fun TasksScreen() {
                         onClick = {
                             vm.submitForm(
                                 title = title,
+                                details = details,
                                 start = startDate,
                                 end = endDate,
                                 type = type,
@@ -806,6 +830,27 @@ private fun CalendarDayCell(
     }
 }
 
+private fun detailsAnnotated(text: String, linkColor: Color): AnnotatedString = buildAnnotatedString {
+    var cursor = 0
+    for (match in DETAILS_URL_REGEX.findAll(text)) {
+        val raw = match.value
+        val url = raw.trimEnd('.', ',', ';', ':')
+        if (url.isEmpty()) continue
+        append(text.substring(cursor, match.range.first))
+        withLink(
+            LinkAnnotation.Url(
+                url = url,
+                styles = TextLinkStyles(
+                    style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
+                ),
+            ),
+        ) { append(url) }
+        append(raw.substring(url.length))
+        cursor = match.range.last + 1
+    }
+    append(text.substring(cursor))
+}
+
 @Composable
 private fun TaskRow(
     task: Task,
@@ -910,6 +955,15 @@ private fun TaskRow(
                     if (task.status == TaskStatus.DELAYED) {
                         Tag(text = s["taskDelayed"])
                     }
+                }
+                task.details?.takeIf { it.isNotBlank() }?.let { details ->
+                    Text(
+                        detailsAnnotated(details, MaterialTheme.colorScheme.primary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StudyFlowTheme.colors.subtle,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

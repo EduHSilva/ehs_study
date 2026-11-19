@@ -22,7 +22,7 @@ test('carrega os projetos pelo prefixo /study', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Projetos' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Projetos', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Projetos e cursos', level: 1 })).toBeVisible()
   await expect(page.getByRole('button', { name: /TCC: História do Brasil/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Introdução/ })).toBeVisible()
   await expect(page.getByText('Entrega do capítulo 1')).toBeVisible()
@@ -47,10 +47,10 @@ test('cadastra projeto pela tela de projetos', async ({ page }) => {
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Projetos' }).click()
-  await page.getByRole('button', { name: /Novo projeto/ }).click()
-  await page.getByRole('textbox', { name: 'Título do projeto' }).fill('Pesquisa de campo')
+  await page.getByRole('button', { name: /Novo projeto ou curso/ }).click()
+  await page.getByRole('textbox', { name: 'Título do projeto ou curso' }).fill('Pesquisa de campo')
   await page.getByRole('textbox', { name: 'Responsável (opcional)' }).fill('Prof. Costa')
-  await page.getByRole('button', { name: 'Cadastrar projeto' }).click()
+  await page.getByRole('button', { name: 'Cadastrar projeto ou curso' }).click()
 
   await expect(page.getByRole('heading', { name: 'Pesquisa de campo' })).toBeVisible()
   expect(state.projects).toHaveLength(1)
@@ -94,9 +94,9 @@ test('edita título e responsável do projeto', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Projetos' }).click()
   await page.getByRole('button', { name: /TCC: História do Brasil/ }).click()
-  await page.getByRole('button', { name: 'Editar projeto' }).click()
+  await page.getByRole('button', { name: 'Editar projeto ou curso' }).click()
   const form = page.locator('.project-edit-form')
-  await form.getByLabel('Título do projeto').fill('TCC revisado')
+  await form.getByLabel('Título do projeto ou curso').fill('TCC revisado')
   await form.getByLabel('Responsável (opcional)').fill('Prof. Lima')
   await form.getByRole('button', { name: 'Salvar' }).click()
 
@@ -119,7 +119,7 @@ test('conclui projeto e ele vai para o fim da lista', async ({ page }) => {
   await expect(list.nth(1)).toContainText('Zeta')
 
   await list.nth(1).click()
-  await page.getByRole('button', { name: 'Concluir projeto' }).click()
+  await page.getByRole('button', { name: 'Concluir projeto ou curso' }).click()
 
   await expect(list.nth(0)).toContainText('Alpha')
   await expect(list.nth(1)).toContainText('Zeta')
@@ -136,11 +136,11 @@ test('exclui projeto após confirmar', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Projetos' }).click()
   await page.getByRole('button', { name: /TCC: História do Brasil/ }).click()
-  await page.getByRole('button', { name: 'Excluir projeto' }).click()
-  await expect(page.getByText('Excluir este projeto?')).toBeVisible()
+  await page.getByRole('button', { name: 'Excluir projeto ou curso' }).click()
+  await expect(page.getByText('Excluir este projeto ou curso?')).toBeVisible()
   await page.getByRole('button', { name: 'Excluir', exact: true }).click()
 
   await expect(page.getByRole('button', { name: /TCC: História do Brasil/ })).toHaveCount(0)
-  await expect(page.getByText('Nenhum projeto ainda.')).toBeVisible()
+  await expect(page.getByText('Nenhum projeto ou curso ainda.')).toBeVisible()
   expect(state.projects).toHaveLength(0)
 })

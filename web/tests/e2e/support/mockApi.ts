@@ -22,6 +22,7 @@ export interface DashboardPayload {
 export interface MockTask {
   id: string
   title: string
+  details?: string | null
   createdDate?: string | null
   startDate?: string | null
   endDate?: string | null

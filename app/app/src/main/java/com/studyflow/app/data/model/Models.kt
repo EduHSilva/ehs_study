@@ -19,6 +19,8 @@ data class DailyTaskCompletion(
 data class Task(
     val id: String,
     val title: String,
+    // Texto livre com anotações e links (ex.: gravações de aula); nulo quando não há detalhes.
+    val details: String? = null,
     val createdDate: String?,
     val startDate: String?,
     val endDate: String?,
@@ -41,6 +43,7 @@ data class Task(
 
 data class TaskInput(
     val title: String,
+    val details: String? = null,
     val startDate: String?,
     val endDate: String?,
     val type: TaskType,
@@ -58,6 +61,7 @@ data class TaskInput(
  */
 data class TaskUpdate(
     val title: String? = null,
+    val details: String? = null,
     val type: TaskType? = null,
     val startDate: String? = null,
     val endDate: String? = null,
