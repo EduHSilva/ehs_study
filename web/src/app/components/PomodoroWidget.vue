@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { currentPage, navigate } from '../composables/useNavigation'
+import { currentPage, requestNavigate } from '../composables/useNavigation'
 import { useI18n } from '../composables/useI18n'
 import { usePomodoro } from '../features/pomodoro/usePomodoro'
 import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
@@ -22,7 +22,7 @@ const finish = async () => {
 <template>
   <aside v-if="visible" class="pomodoro-widget" :class="{ completed, break: mode === 'break' }">
     <p class="widget-announcement" role="status">{{ completed ? completionLabel : '' }}</p>
-    <button class="widget-time" :aria-label="t('openTimer')" @click="navigate('pomodoro')">
+    <button class="widget-time" :aria-label="t('openTimer')" @click="requestNavigate('pomodoro')">
       <small>{{ completed ? completionLabel : modeLabel }}</small>
       <strong>{{ timeLeft }}</strong>
       <span v-if="!completed" class="widget-status">{{ running ? t('timerRunning') : t('timerPaused') }}</span>

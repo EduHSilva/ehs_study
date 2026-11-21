@@ -9,6 +9,7 @@ import type { AppPage } from '../composables/useNavigation'
 const emit = defineEmits<{ navigate: [page: AppPage] }>()
 import { useStudentProfile } from '../features/auth/useAuth'
 import { useDashboard } from '../features/dashboard/useDashboard'
+import { plainNoteText } from '../features/notes/noteMarkdown'
 import { requestOpenNote } from '../features/notes/useNotes'
 import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
 import { formatEndDate } from '../features/tasks/taskFormat'
@@ -20,6 +21,10 @@ const { data, focus, tasks, loading, error, progress, savingTaskId, load, toggle
 const openNote = (id: string) => {
   requestOpenNote(id)
   emit('navigate', 'notes')
+}
+const notePreview = (value: string) => {
+  const text = plainNoteText(value).replace(/\s+/g, ' ')
+  return text.length > 110 ? `${text.slice(0, 110)}…` : text
 }
 const {
   mode: timerMode,
@@ -61,7 +66,7 @@ const focusTime = computed(() => {
         </div>
         <div class="right-column">
           <article class="card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button></div></article>
-          <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-list"><button v-for="note in data.notes" :key="note.id" type="button" class="note" @click="openNote(note.id)"><strong>{{ note.title }}</strong></button></div></article>
+          <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-list"><button v-for="note in data.notes" :key="note.id" type="button" class="note" @click="openNote(note.id)"><strong>{{ note.title }}</strong><small v-if="notePreview(note.content)">{{ notePreview(note.content) }}</small></button></div></article>
         </div>
       </div>
     <p v-else class="empty-note">{{ t('dashboardError') }}</p>
@@ -69,6 +74,7 @@ const focusTime = computed(() => {
 </template>
 
 <style scoped>
-.note{width:100%;text-align:left;color:var(--color-text);font:inherit;cursor:pointer}
+.note{display:grid;gap:4px;width:100%;text-align:left;color:var(--color-text);font:inherit;cursor:pointer}
+.note small{overflow:hidden;color:var(--color-muted);font-size:12px;line-height:1.4;text-overflow:ellipsis;white-space:nowrap}
 .note:hover{border-color:var(--color-border-strong)}
 </style>

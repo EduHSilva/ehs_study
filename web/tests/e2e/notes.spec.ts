@@ -117,6 +117,130 @@ test('cria uma pasta', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Nova nota/ })).toBeVisible()
 })
 
+test('formata o texto pela barra com markdown', async ({ page }) => {
+  await openNotes(page)
+  const textarea = page.locator('.editor textarea')
+
+  await textarea.fill('Primeira linha\nSegunda linha')
+  await textarea.focus()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.getByRole('button', { name: 'Lista com marcadores' }).click()
+  await expect(textarea).toHaveValue('- Primeira linha\n- Segunda linha')
+
+  await textarea.fill('texto importante')
+  await textarea.focus()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.getByRole('button', { name: 'Título 1' }).click()
+  await expect(textarea).toHaveValue('# texto importante')
+
+  await textarea.fill('texto importante')
+  await textarea.evaluate(element => {
+    const area = element as HTMLTextAreaElement
+    area.focus()
+    area.setSelectionRange(0, 5)
+  })
+  await page.getByRole('button', { name: 'Negrito' }).click()
+  await expect(textarea).toHaveValue('**texto** importante')
+})
+
+test('prévia renderiza o markdown e volta ao texto cru', async ({ page }) => {
+  await openNotes(page)
+  const textarea = page.locator('.editor textarea')
+  const markdown = '# Título da aula\n\n**Importante** e lista:\n\n- um\n- dois'
+
+  await textarea.fill(markdown)
+  await page.getByRole('button', { name: 'Visualizar' }).click()
+
+  const preview = page.locator('.note-preview')
+  await expect(preview.locator('h1')).toHaveText('Título da aula')
+  await expect(preview.locator('strong')).toHaveText('Importante')
+  await expect(preview.locator('li')).toHaveCount(2)
+  await expect(textarea).toBeHidden()
+
+  await page.getByRole('button', { name: 'Editar' }).click()
+  await expect(textarea).toHaveValue(markdown)
+})
+
+test('expande o editor em tela cheia e restaura com Esc', async ({ page }) => {
+  await openNotes(page)
+  await page.getByRole('button', { name: 'Expandir editor' }).click()
+
+  const editor = page.locator('.editor.expanded')
+  await expect(editor).toBeVisible()
+  await expect(page.locator('.note-cards')).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Restaurar editor' })).toBeVisible()
+
+  const viewport = page.viewportSize()
+  const box = await editor.boundingBox()
+  expect(box?.width).toBeGreaterThanOrEqual((viewport?.width ?? 0) - 1)
+  expect(box?.height).toBeGreaterThanOrEqual((viewport?.height ?? 0) - 1)
+
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.editor.expanded')).toHaveCount(0)
+  await expect(page.locator('.note-cards')).toBeVisible()
+})
+
+test('pede confirmação ao trocar de tela com alterações não salvas', async ({ page }) => {
+  await openNotes(page)
+  const textarea = page.locator('.editor textarea')
+  await textarea.fill('Conteúdo pendente')
+
+  await page.getByRole('button', { name: 'Tarefas' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Alterações não salvas' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Anotações de Aula' })).toBeVisible()
+  await expect(textarea).toHaveValue('Conteúdo pendente')
+
+  await page.getByRole('button', { name: 'Tarefas' }).click()
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Descartar' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Tarefas' })).toBeVisible()
+})
+
+test('salva a anotação antes de sair quando pedido', async ({ page }) => {
+  await openNotes(page)
+  await page.locator('.editor textarea').fill('Conteúdo salvo ao sair')
+
+  await page.getByRole('button', { name: 'Tarefas' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Alterações não salvas' })
+  await dialog.getByRole('button', { name: 'Salvar' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Tarefas' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Anotações' }).click()
+  await expect(page.locator('.editor textarea')).toHaveValue('Conteúdo salvo ao sair')
+  await expect(page.locator('.note-cards .note-card').first()).toContainText('Conteúdo salvo ao sair')
+})
+
+test('protege também a navegação pelo botão voltar', async ({ page }) => {
+  await openNotes(page)
+  await page.locator('.editor textarea').fill('Pendente no voltar')
+
+  await page.goBack()
+  const dialog = page.getByRole('dialog', { name: 'Alterações não salvas' })
+  await expect(dialog).toBeVisible()
+
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByRole('heading', { name: 'Anotações de Aula' })).toBeVisible()
+  await expect(page.locator('.editor textarea')).toHaveValue('Pendente no voltar')
+})
+
+test('pede confirmação ao trocar de nota com alterações não salvas', async ({ page }) => {
+  await openNotes(page)
+  await page.locator('.editor textarea').fill('Rascunho')
+
+  await page.getByRole('button', { name: 'Revolução' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Alterações não salvas' })
+  await expect(dialog).toBeVisible()
+
+  await dialog.getByRole('button', { name: 'Descartar' }).click()
+  await expect(page.locator('.editor input')).toHaveValue('Revolução')
+})
+
 test('exclui a pasta selecionada e volta para a primeira', async ({ page }) => {
   await openNotes(page)
 

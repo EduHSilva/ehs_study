@@ -48,6 +48,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -73,6 +74,7 @@ import com.studyflow.app.feature.auth.BrandMark
 import com.studyflow.app.feature.auth.SessionViewModel
 import com.studyflow.app.feature.dashboard.DashboardScreen
 import com.studyflow.app.feature.kanban.KanbanScreen
+import com.studyflow.app.feature.notes.NotesLeaveGuard
 import com.studyflow.app.feature.notes.NotesNavigation
 import com.studyflow.app.feature.notes.NotesScreen
 import com.studyflow.app.feature.pomodoro.PomodoroScreen
@@ -129,10 +131,22 @@ private fun MainScaffold(user: AuthUser, onLogout: () -> Unit) {
     val isProjectDetail = route == Routes.PROJECT_DETAIL
 
     val go: (String) -> Unit = { destination ->
-        navController.navigate(destination) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
+        scope.launch {
+            if (destination != route && route == Routes.NOTES && !NotesLeaveGuard.canLeave()) {
+                return@launch
+            }
+            navController.navigate(destination) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    // Voltar com alterações não salvas na nota passa pelo mesmo diálogo antes de sair da tela.
+    BackHandler(enabled = route == Routes.NOTES && !drawerState.isOpen) {
+        scope.launch {
+            if (NotesLeaveGuard.canLeave()) navController.popBackStack()
         }
     }
 

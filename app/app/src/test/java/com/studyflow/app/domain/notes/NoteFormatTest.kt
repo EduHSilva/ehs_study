@@ -31,6 +31,14 @@ class NoteFormatTest {
     }
 
     @Test
+    fun `previa e contagem ignoram a sintaxe do markdown`() {
+        val content = "# Título\n\n**Negrito** e *itálico* com [link](https://exemplo.com) e `código`."
+        assertEquals("Título Negrito e itálico com link e código.", NoteFormat.preview(content))
+        assertEquals(8, NoteFormat.wordCount(content))
+        assertEquals("Item um Item dois", NoteFormat.preview("- Item um\n- Item dois"))
+    }
+
+    @Test
     fun `titulo vazio cai no fallback`() {
         assertEquals("Sem título", NoteFormat.title(null, "Sem título"))
         assertEquals("Sem título", NoteFormat.title("   ", "Sem título"))

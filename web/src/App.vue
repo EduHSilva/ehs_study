@@ -2,7 +2,7 @@
 import { computed, watchEffect } from 'vue'
 import type { Component } from 'vue'
 import { useAuth, useStudentProfile } from './app/features/auth/useAuth'
-import { currentPage, navigate } from './app/composables/useNavigation'
+import { currentPage, requestNavigate } from './app/composables/useNavigation'
 import type { AppPage } from './app/composables/useNavigation'
 import AppSidebar from './app/components/AppSidebar.vue'
 import LandingPage from './app/pages/LandingPage.vue'
@@ -80,8 +80,8 @@ watchEffect(() => {
 <template>
   <LandingPage v-if="!isAuthenticated" />
   <main v-else class="app-shell">
-    <AppSidebar v-bind="student" :active="currentPage" @navigate="navigate" @prefetch="prefetchPage" />
-    <component :is="page" :key="currentPage" @navigate="navigate" />
+    <AppSidebar v-bind="student" :active="currentPage" @navigate="requestNavigate" @prefetch="prefetchPage" />
+    <component :is="page" :key="currentPage" @navigate="requestNavigate" />
     <PomodoroWidget />
   </main>
 </template>

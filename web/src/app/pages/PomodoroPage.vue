@@ -10,10 +10,12 @@ import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
 const { sessions, loading, saving, error, load, registerSession } = usePomodoro()
-const { mode, running, remaining, started, completed, focusCount, settings, duration, elapsedMinutes, toggle, reset, setMode, updateSettings, advanceAfterFocus } = usePomodoroTimer()
+const { mode, running, remaining, started, completed, settings, duration, elapsedMinutes, toggle, reset, setMode, updateSettings, advanceAfterFocus } = usePomodoroTimer()
 onMounted(load)
 
-const sessionNumber = computed(() => (focusCount.value % settings.value.cycles) + 1)
+// O contador do ciclo vem das sessões concluídas hoje (fonte persistida no servidor), para
+// continuar correto depois de recarregar a página ou trocar de dispositivo.
+const sessionNumber = computed(() => (sessions.value.length % settings.value.cycles) + 1)
 const time = computed(
   () => `${String(Math.floor(remaining.value / 60)).padStart(2, '0')}:${String(remaining.value % 60).padStart(2, '0')}`
 )

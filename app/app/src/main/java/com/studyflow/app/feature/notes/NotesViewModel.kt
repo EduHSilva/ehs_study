@@ -102,53 +102,53 @@ class NotesViewModel(
         return true
     }
 
-    fun saveSelected(title: String, content: String) {
-        val note = _state.value.selectedNote ?: return
-        if (_state.value.saving) return
-        viewModelScope.launch {
-            _state.update { it.copy(saving = true, errorKey = null, savedMessageKey = null) }
-            try {
-                val saved = notesRepository.saveNote(note.id, title, content)
-                replaceNote(saved.copy(folderId = note.folderId))
-                _state.update { it.copy(savedMessageKey = "savedNow") }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _state.update { it.copy(errorKey = "noteSaveFailed") }
-            } finally {
-                _state.update { it.copy(saving = false) }
-            }
+    suspend fun saveSelected(title: String, content: String): Boolean {
+        val note = _state.value.selectedNote ?: return false
+        if (_state.value.saving) return false
+        _state.update { it.copy(saving = true, errorKey = null, savedMessageKey = null) }
+        return try {
+            val saved = notesRepository.saveNote(note.id, title, content)
+            replaceNote(saved.copy(folderId = note.folderId))
+            _state.update { it.copy(savedMessageKey = "savedNow") }
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            _state.update { it.copy(errorKey = "noteSaveFailed") }
+            false
+        } finally {
+            _state.update { it.copy(saving = false) }
         }
     }
 
-    fun createNote(title: String, content: String) {
-        val folder = _state.value.selectedFolder ?: return
+    suspend fun createNote(title: String, content: String): Boolean {
+        val folder = _state.value.selectedFolder ?: return false
         val trimmed = title.trim()
         if (trimmed.isEmpty()) {
             _state.update { it.copy(errorKey = "noteTitleRequired") }
-            return
+            return false
         }
-        if (_state.value.saving) return
-        viewModelScope.launch {
-            _state.update { it.copy(saving = true, errorKey = null, savedMessageKey = null) }
-            try {
-                val note = notesRepository.createNote(folder.id, trimmed, content)
-                _state.update { current ->
-                    current.copy(
-                        folders = current.folders.map {
-                            if (it.id == folder.id) it.copy(notes = it.notes + note) else it
-                        },
-                        selectedNoteId = note.id,
-                        savedMessageKey = "savedNow",
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                _state.update { it.copy(errorKey = "noteCreateFailed") }
-            } finally {
-                _state.update { it.copy(saving = false) }
+        if (_state.value.saving) return false
+        _state.update { it.copy(saving = true, errorKey = null, savedMessageKey = null) }
+        return try {
+            val note = notesRepository.createNote(folder.id, trimmed, content)
+            _state.update { current ->
+                current.copy(
+                    folders = current.folders.map {
+                        if (it.id == folder.id) it.copy(notes = it.notes + note) else it
+                    },
+                    selectedNoteId = note.id,
+                    savedMessageKey = "savedNow",
+                )
             }
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            _state.update { it.copy(errorKey = "noteCreateFailed") }
+            false
+        } finally {
+            _state.update { it.copy(saving = false) }
         }
     }
 
