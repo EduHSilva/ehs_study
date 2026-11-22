@@ -6,11 +6,13 @@ import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
 import { usePomodoro } from '../features/pomodoro/usePomodoro'
 import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
+import { usePomodoroPip } from '../features/pomodoro/usePomodoroPip'
 
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
-const { sessions, loading, saving, error, load, registerSession } = usePomodoro()
-const { mode, running, remaining, started, completed, settings, duration, elapsedMinutes, toggle, reset, setMode, updateSettings, advanceAfterFocus } = usePomodoroTimer()
+const { sessions, loading, saving, error, load } = usePomodoro()
+const { mode, running, remaining, started, completed, settings, duration, toggle, reset, setMode, updateSettings } = usePomodoroTimer()
+const { pipSupported, pipOpen, toggleKeepVisible, finish } = usePomodoroPip()
 onMounted(load)
 
 // O contador do ciclo vem das sessões concluídas hoje (fonte persistida no servidor), para
@@ -20,11 +22,6 @@ const time = computed(
   () => `${String(Math.floor(remaining.value / 60)).padStart(2, '0')}:${String(remaining.value % 60).padStart(2, '0')}`
 )
 const ringProgress = computed(() => Math.round(((duration.value - remaining.value) / duration.value) * 100))
-
-const finishSession = async () => {
-  if (mode.value !== 'focus' || !started.value) return
-  if (await registerSession(t('focusSessionTitle'), elapsedMinutes.value)) advanceAfterFocus()
-}
 
 const completionText = computed(
   () => t(mode.value === 'focus' ? 'focusComplete' : mode.value === 'longBreak' ? 'longBreakComplete' : 'breakComplete')
@@ -51,7 +48,7 @@ const sessionTime = (value: string | null) => {
     <div class="pomodoro-layout">
       <article class="card timer-card" :class="{ finished: completed }"><div class="mode-switch"><button :class="{selected:mode==='focus'}" @click="setMode('focus')">{{ t('focusMode') }}</button><button :class="{selected:mode==='break'}" @click="setMode('break')">{{ t('breakMode') }}</button><button :class="{selected:mode==='longBreak'}" @click="setMode('longBreak')">{{ t('longBreakMode') }}</button></div><div class="timer-ring" :style="{ '--timer-progress': `${ringProgress}%` }"><div><strong>{{ time }}</strong><small>{{ t('sessionCounter', { current: sessionNumber, total: settings.cycles }) }}</small></div></div>
         <p v-if="completed" class="timer-complete" role="status">{{ completionText }} <span>{{ completionHint }}</span></p>
-        <div class="timer-actions"><button class="button secondary" @click="reset">{{ t('reset') }}</button><button v-if="completed && mode !== 'focus'" class="button" @click="setMode('focus')">{{ t('backToFocus') }}</button><button v-if="!completed" class="button" @click="toggle">{{ running ? t('pause') : t('start') }}</button><button v-if="started && mode === 'focus'" class="button finish-session" :disabled="saving" @click="finishSession">{{ saving ? t('saving') : t('finishSession') }}</button></div></article>
+        <div class="timer-actions"><button class="button secondary" @click="reset">{{ t('reset') }}</button><button v-if="completed && mode !== 'focus'" class="button" @click="setMode('focus')">{{ t('backToFocus') }}</button><button v-if="!completed" class="button" @click="toggle">{{ running ? t('pause') : t('start') }}</button><button v-if="started && mode === 'focus'" class="button finish-session" :disabled="saving" @click="finish">{{ saving ? t('saving') : t('finishSession') }}</button><button v-if="pipSupported" class="button secondary keep-visible" :aria-pressed="pipOpen" :title="pipOpen ? t('keepVisibleOff') : t('keepVisibleHint')" @click="toggleKeepVisible">{{ pipOpen ? t('keepVisibleOff') : t('keepVisible') }}</button></div></article>
       <div class="right-column">
         <article class="card sessions"><h2>{{ t('sessions') }}</h2>
           <template v-if="loading">

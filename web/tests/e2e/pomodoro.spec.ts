@@ -143,6 +143,36 @@ test('abre o cronômetro em janela flutuante pelo botão manter visível', async
   await expect(widget.getByRole('button', { name: 'Manter visível' })).toHaveAttribute('aria-pressed', 'false')
 })
 
+test('abre a janela flutuante direto da tela do Pomodoro', async ({ page }) => {
+  await signIn(page)
+  await mockApi(page, { folders: [] })
+  await page.clock.install()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pomodoro' }).click()
+  await page.getByRole('button', { name: 'Começar' }).click()
+  await page.clock.runFor(60 * 1000)
+
+  const supported = await page.evaluate(() => 'documentPictureInPicture' in window)
+  test.skip(!supported, 'Document Picture-in-Picture indisponível neste navegador')
+
+  await page.getByRole('button', { name: 'Manter visível' }).click()
+  await expect(page.getByRole('button', { name: 'Fechar janela flutuante' })).toHaveAttribute('aria-pressed', 'true')
+
+  const pipText = () => page.evaluate(() => {
+    const api = (window as unknown as { documentPictureInPicture?: { window: Window | null } }).documentPictureInPicture
+    return api?.window && !api.window.closed ? api.window.document.body.innerText : ''
+  })
+  await expect.poll(pipText).toContain('24:00')
+
+  // A janela sobrevive à navegação e o widget passa a refletir o mesmo estado.
+  await page.getByRole('button', { name: 'Dashboard' }).click()
+  await expect.poll(pipText).toContain('24:00')
+  const widgetPin = page.locator('.pomodoro-widget').getByRole('button', { name: 'Fechar janela flutuante' })
+  await expect(widgetPin).toHaveAttribute('aria-pressed', 'true')
+  await widgetPin.click()
+  await expect(page.locator('.pomodoro-widget').getByRole('button', { name: 'Manter visível' })).toHaveAttribute('aria-pressed', 'false')
+})
+
 test('toca o alerta sonoro quando o ciclo termina', async ({ page }) => {
   await signIn(page)
   await mockApi(page, { folders: [] })

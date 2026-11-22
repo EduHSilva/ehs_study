@@ -1,91 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 import { currentPage, requestNavigate } from '../composables/useNavigation'
 import { useI18n } from '../composables/useI18n'
-import { useTheme } from '../composables/useTheme'
-import { usePomodoro } from '../features/pomodoro/usePomodoro'
 import { usePomodoroTimer } from '../features/pomodoro/usePomodoroTimer'
-import { notifyFocusEnd, requestNotificationPermission, setTimerTitle } from '../features/pomodoro/pomodoroAlerts'
-import { PomodoroPipWindow, isPipSupported } from '../features/pomodoro/pomodoroPip'
-import type { PipView } from '../features/pomodoro/pomodoroPip'
+import { usePomodoroPip } from '../features/pomodoro/usePomodoroPip'
 
 const { t } = useI18n()
-const { theme } = useTheme()
-const { saving, registerSession } = usePomodoro()
-const { mode, running, started, completed, isActive, elapsedMinutes, timeLeft, toggle, reset, advanceAfterFocus } = usePomodoroTimer()
-
-const pip = new PomodoroPipWindow()
-const pipSupported = isPipSupported()
-const pipOpen = ref(false)
+const { mode, running, completed, isActive, timeLeft, toggle, reset } = usePomodoroTimer()
+const { pipSupported, pipOpen, toggleKeepVisible, canFinish, saving, finish, dispose } = usePomodoroPip()
 
 const visible = computed(() => currentPage.value !== 'pomodoro' && isActive.value)
-const canFinish = computed(() => mode.value === 'focus' && started.value)
 const modeLabel = computed(() => t(mode.value === 'focus' ? 'focusModeShort' : mode.value === 'longBreak' ? 'longBreakModeShort' : 'breakModeShort'))
 const completionLabel = computed(() => t(mode.value === 'focus' ? 'focusComplete' : mode.value === 'longBreak' ? 'longBreakComplete' : 'breakComplete'))
-const statusLabel = computed(() => (completed.value ? '' : running.value ? t('timerRunning') : t('timerPaused')))
 
-const finish = async () => {
-  if (!canFinish.value) return
-  if (await registerSession(t('focusSessionTitle'), elapsedMinutes.value)) advanceAfterFocus()
-}
-
-const pipView = computed<PipView>(() => ({
-  label: completed.value ? completionLabel.value : modeLabel.value,
-  time: timeLeft.value,
-  status: statusLabel.value,
-  completed: completed.value,
-  canToggle: !completed.value,
-  toggleLabel: running.value ? t('pause') : t('start'),
-  canFinish: canFinish.value,
-  finishLabel: saving.value ? t('saving') : t('finishSession'),
-  finishDisabled: saving.value
-}))
-
-const toggleKeepVisible = async () => {
-  if (pipOpen.value) {
-    pip.close()
-    return
-  }
-  const opened = await pip.open(
-    {
-      toggle,
-      finish: () => void finish(),
-      closed: () => { pipOpen.value = false }
-    },
-    pipView.value
-  )
-  pipOpen.value = opened
-}
-
-watch(pipView, (view) => pip.update(view))
-watch(theme, () => pip.refreshTheme(), { flush: 'post' })
-
-// O pedido de notificação aproveita o gesto de iniciar o cronômetro; o navegador só pergunta uma vez.
-watch(running, (value) => {
-  if (value) void requestNotificationPermission()
-})
-
-// Com a aba oculta o widget não aparece: avisa pelo sistema, a menos que a janela flutuante esteja
-// aberta (aí o usuário já vê o fim do ciclo).
-watch(completed, (value, previous) => {
-  if (!value || previous || pipOpen.value) return
-  if (document.visibilityState === 'visible') return
-  notifyFocusEnd(t('timerTitle'), completionLabel.value)
-})
-
-// Fallback universal: a aba passa a mostrar o tempo mesmo quando o PiP não existe.
-watchEffect(() => {
-  if (!isActive.value) {
-    setTimerTitle(null)
-    return
-  }
-  setTimerTitle(completed.value ? `✓ ${completionLabel.value}` : `${timeLeft.value} · ${modeLabel.value}`)
-})
-
-onBeforeUnmount(() => {
-  pip.close()
-  setTimerTitle(null)
-})
+onBeforeUnmount(dispose)
 </script>
 <template>
   <aside v-if="visible" class="pomodoro-widget" :class="{ completed, break: mode === 'break' }">
