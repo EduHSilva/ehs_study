@@ -173,6 +173,28 @@ test('abre a janela flutuante direto da tela do Pomodoro', async ({ page }) => {
   await expect(page.locator('.pomodoro-widget').getByRole('button', { name: 'Manter visível' })).toHaveAttribute('aria-pressed', 'false')
 })
 
+test('a janela flutuante acompanha o tema escuro', async ({ page }) => {
+  await signIn(page)
+  await page.addInitScript(() => localStorage.setItem('studyflow-theme', 'dark'))
+  await mockApi(page, { folders: [] })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pomodoro' }).click()
+  await page.getByRole('button', { name: 'Começar' }).click()
+
+  const supported = await page.evaluate(() => 'documentPictureInPicture' in window)
+  test.skip(!supported, 'Document Picture-in-Picture indisponível neste navegador')
+
+  await page.getByRole('button', { name: 'Manter visível' }).click()
+  await expect(page.getByRole('button', { name: 'Fechar janela flutuante' })).toHaveAttribute('aria-pressed', 'true')
+
+  const pipBackground = () => page.evaluate(() => {
+    const api = (window as unknown as { documentPictureInPicture?: { window: Window | null } }).documentPictureInPicture
+    const win = api?.window
+    return win ? win.getComputedStyle(win.document.body).backgroundColor : ''
+  })
+  await expect.poll(pipBackground).toBe('rgb(39, 39, 42)')
+})
+
 test('toca o alerta sonoro quando o ciclo termina', async ({ page }) => {
   await signIn(page)
   await mockApi(page, { folders: [] })

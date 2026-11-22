@@ -176,11 +176,15 @@ export class PomodoroPipWindow {
   }
 
   private applyTheme(): void {
-    if (!this.root) return
+    if (!this.win) return
+    // Os tokens precisam ficar no <html> da janela flutuante: o body é quem define o fundo,
+    // então aplicá-los só no card deixaria fundo claro com texto do tema escuro.
+    const target = this.win.document.documentElement
     const source = window.getComputedStyle(document.documentElement)
     for (const token of THEME_TOKENS) {
       const value = source.getPropertyValue(token).trim()
-      if (value) this.root.style.setProperty(token, value)
+      if (value) target.style.setProperty(token, value)
     }
+    target.style.colorScheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
   }
 }
