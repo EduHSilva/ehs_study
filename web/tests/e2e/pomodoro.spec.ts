@@ -99,6 +99,50 @@ test('finaliza a sessão pelo widget e registra no servidor', async ({ page }) =
   await expect(widget).toBeHidden()
 })
 
+test('mostra o tempo restante no título da aba e o devolve ao reiniciar', async ({ page }) => {
+  await signIn(page)
+  await mockApi(page, { folders: [] })
+  await page.clock.install()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pomodoro' }).click()
+  await page.getByRole('button', { name: 'Começar' }).click()
+  await page.clock.runFor(60 * 1000)
+
+  await expect.poll(() => page.title()).toBe('24:00 · Foco')
+
+  await page.getByRole('button', { name: 'Reiniciar' }).click()
+  await expect.poll(() => page.title()).toContain('Estudos')
+})
+
+test('abre o cronômetro em janela flutuante pelo botão manter visível', async ({ page }) => {
+  await signIn(page)
+  await mockApi(page, { folders: [] })
+  await page.clock.install()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pomodoro' }).click()
+  await page.getByRole('button', { name: 'Começar' }).click()
+  await page.clock.runFor(60 * 1000)
+  await page.getByRole('button', { name: 'Dashboard' }).click()
+
+  const supported = await page.evaluate(() => 'documentPictureInPicture' in window)
+  test.skip(!supported, 'Document Picture-in-Picture indisponível neste navegador')
+
+  const widget = page.locator('.pomodoro-widget')
+  await widget.getByRole('button', { name: 'Manter visível' }).click()
+  const pin = widget.getByRole('button', { name: 'Fechar janela flutuante' })
+  await expect(pin).toHaveAttribute('aria-pressed', 'true')
+
+  const pipText = () => page.evaluate(() => {
+    const api = (window as unknown as { documentPictureInPicture?: { window: Window | null } }).documentPictureInPicture
+    return api?.window && !api.window.closed ? api.window.document.body.innerText : ''
+  })
+  await expect.poll(pipText).toContain('24:00')
+  await expect.poll(pipText).toContain('Pausar')
+
+  await pin.click()
+  await expect(widget.getByRole('button', { name: 'Manter visível' })).toHaveAttribute('aria-pressed', 'false')
+})
+
 test('toca o alerta sonoro quando o ciclo termina', async ({ page }) => {
   await signIn(page)
   await mockApi(page, { folders: [] })
