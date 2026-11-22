@@ -13,6 +13,7 @@ import com.studyflow.app.data.model.TaskUpdate
 import com.studyflow.app.data.repository.ProjectsRepository
 import com.studyflow.app.data.repository.TasksRepository
 import com.studyflow.app.domain.ApiDates
+import com.studyflow.app.domain.notes.NoteMarkdown
 import com.studyflow.app.domain.tasks.StudyCalendar
 import com.studyflow.app.domain.tasks.StudyCalendar.CalendarMode
 import com.studyflow.app.domain.tasks.TaskFormat
@@ -605,6 +606,29 @@ class TasksViewModel(
                 _state.update { it.copy(errorKey = "taskSaveFailed") }
             } finally {
                 _state.update { it.copy(savingId = null) }
+            }
+        }
+    }
+
+    // Checklist dos detalhes: o texto é a fonte da verdade, então a marcação é otimista e manda
+    // só `details` — sem passar pelo formulário de edição.
+    fun toggleDetailsCheck(id: String, index: Int) {
+        val task = _state.value.items.firstOrNull { it.id == id } ?: return
+        val details = task.details ?: return
+        val next = NoteMarkdown.toggleCheckItem(details, index)
+        if (next == details) return
+
+        replaceTask(task.copy(details = next))
+        viewModelScope.launch {
+            try {
+                val saved = tasksRepository.update(id, TaskUpdate(details = next))
+                // O PUT não devolve o histórico de conclusões da recorrente.
+                replaceTask(saved.copy(dailyCompletions = task.dailyCompletions))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                replaceTask(task)
+                _state.update { it.copy(errorKey = "taskSaveFailed") }
             }
         }
     }

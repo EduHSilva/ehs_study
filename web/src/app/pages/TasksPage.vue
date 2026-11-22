@@ -6,7 +6,7 @@ import ThemeToggle from '../components/ThemeToggle.vue'
 import { useI18n } from '../composables/useI18n'
 import type { AppPage } from '../composables/useNavigation'
 import { useTasks } from '../features/tasks/useTasks'
-import { detailsSegments, MAX_DETAILS_LENGTH } from '../features/tasks/taskDetails'
+import { MAX_DETAILS_LENGTH, renderTaskDetails } from '../features/tasks/taskDetails'
 import { formatEndDate, formatTaskPeriod } from '../features/tasks/taskFormat'
 import { parseDayKey, scheduledOn, weeklyGoalProgress } from '../features/tasks/calendar'
 import { isRecurringType } from '../features/tasks/types'
@@ -14,8 +14,18 @@ import type { Task, TaskType } from '../features/tasks/types'
 
 defineEmits<{ navigate: [page: AppPage] }>()
 const { t, locale } = useI18n()
-const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, copied, pendingCount, recurringCount, anchor, mode, calendar, selectedDay, projectFilter, formOpen, title, details, startDate, endDate, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, canToggle, statsOpen, statsLoading, statsTasks, statsError, toggleStats, load, goToPage, navigate, jumpTo, setMode, toggle, copyTasks, remove, toggleForm, create, openEdit, submitForm } = useTasks()
+const { items, loading, pageLoading, calendarLoading, page, total, lastPage, canGoPrev, canGoNext, error, savingId, deletingId, copied, pendingCount, recurringCount, anchor, mode, calendar, selectedDay, projectFilter, formOpen, title, details, startDate, endDate, type, recurrenceDays, recurrenceDayOfMonth, weeklyGoal, projectId, stageId, projectOptions, stages, projectName, stageName, creating, updating, editingId, editingTask, formError, todayKey, isDone, canToggle, statsOpen, statsLoading, statsTasks, statsError, toggleStats, load, goToPage, navigate, jumpTo, setMode, toggle, toggleDetailsCheck, copyTasks, remove, toggleForm, create, openEdit, submitForm } = useTasks()
 onMounted(load)
+
+// Os checkboxes vêm do `v-html`, então o clique é delegado: o índice do item no texto vai junto
+// no `data-check-index` e a marcação real acontece no estado da tarefa.
+const onDetailsClick = (event: MouseEvent, item: Task) => {
+  const target = event.target as HTMLElement | null
+  const input = target?.closest<HTMLInputElement>('input[type="checkbox"][data-check-index]')
+  if (!input) return
+  event.preventDefault()
+  toggleDetailsCheck(item.id, Number(input.dataset.checkIndex))
+}
 
 const formEl = ref<HTMLFormElement | null>(null)
 const startEdit = async (task: Task) => {
@@ -186,7 +196,7 @@ const taskPeriodLabel = (item: Task): string => {
       <div v-for="item in items" :key="item.id" class="task-line">
         <div class="task-main">
         <button class="task-row" :disabled="savingId === item.id || !canToggle(item)" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small v-if="taskPeriodLabel(item)">{{ taskPeriodLabel(item) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="isRecurringType(item.type)" class="tag daily">{{ typeLabel(item.type) }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
-          <p v-if="item.details" class="task-detail"><template v-for="(segment, index) in detailsSegments(item.details)" :key="index"><a v-if="segment.href" :href="segment.href" target="_blank" rel="noopener noreferrer">{{ segment.text }}</a><span v-else>{{ segment.text }}</span></template></p>
+          <div v-if="item.details" class="task-detail" @click="onDetailsClick($event, item)" v-html="renderTaskDetails(item.details)"></div>
         </div>
         <button class="task-edit" :aria-label="t('taskEditAction')" @click="startEdit(item)">✎</button>
         <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>

@@ -99,6 +99,26 @@ test('mostra os detalhes da tarefa com o link clicável', async ({ page }) => {
     .toHaveAttribute('href', 'https://example.com/aula-1')
 })
 
+test('marca subtarefas do checklist nos detalhes', async ({ page }) => {
+  const state = stateWithTask()
+  state.tasks = [{
+    ...structuredClone(TASK),
+    details: '- [ ] Aula 1\n- [ ] **Aula 2**'
+  }]
+  await signIn(page)
+  await mockApi(page, state)
+  await openTasks(page)
+
+  const checks = page.locator('.task-detail input[type="checkbox"]')
+  await expect(checks).toHaveCount(2)
+  await expect(checks.nth(0)).not.toBeChecked()
+
+  await checks.nth(1).click()
+  await expect.poll(() => state.tasks?.[0].details).toBe('- [ ] Aula 1\n- [x] **Aula 2**')
+  await expect(checks.nth(1)).toBeChecked()
+  await expect(checks.nth(0)).not.toBeChecked()
+})
+
 test('tarefa única concluída aparece só no dia da execução no calendário', async ({ page }) => {
   const today = new Date()
   const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7))

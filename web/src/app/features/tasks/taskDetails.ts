@@ -1,28 +1,34 @@
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
+
 export const MAX_DETAILS_LENGTH = 2000
 
-const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi
-const TRAILING_PUNCTUATION = /[.,;:!?]+$/
+marked.setOptions({ gfm: true, breaks: true })
 
-export interface DetailsSegment {
-  text: string
-  href?: string
+// Mesma sintaxe de checklist aceita pelo `marked` (GFM); o índice da ocorrência é o que liga o
+// checkbox renderizado de volta à linha do texto original.
+const CHECK_ITEM = /^([ \t]*(?:[-*+]|\d+[.)])[ \t]+\[)([ xX])(\])/gm
+
+// Renderiza os detalhes com o mesmo Markdown das notas e deixa os checkboxes clicáveis: cada um
+// carrega o índice da ocorrência no texto original, usado por `toggleDetailsCheck`.
+export function renderTaskDetails(markdown: string): string {
+  const template = document.createElement('template')
+  template.innerHTML = DOMPurify.sanitize(marked.parse(markdown, { async: false }))
+  template.content.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((input, index) => {
+    input.removeAttribute('disabled')
+    input.dataset.checkIndex = String(index)
+  })
+  template.content.querySelectorAll('a').forEach(link => {
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+  })
+  return template.innerHTML
 }
 
-// Quebra os detalhes em texto e URLs para renderizar links de verdade, sem `v-html`.
-export function detailsSegments(text: string): DetailsSegment[] {
-  const segments: DetailsSegment[] = []
-  let cursor = 0
-  for (const match of text.matchAll(URL_PATTERN)) {
-    const start = match.index ?? 0
-    const raw = match[0]
-    const url = raw.replace(TRAILING_PUNCTUATION, '')
-    if (!url) continue
-    if (start > cursor) segments.push({ text: text.slice(cursor, start) })
-    segments.push({ text: url, href: url })
-    const trailing = raw.slice(url.length)
-    if (trailing) segments.push({ text: trailing })
-    cursor = start + raw.length
-  }
-  if (cursor < text.length) segments.push({ text: text.slice(cursor) })
-  return segments
+export function toggleDetailsCheck(markdown: string, index: number): string {
+  let current = 0
+  return markdown.replace(CHECK_ITEM, (item, prefix: string, mark: string, close: string) => {
+    if (current++ !== index) return item
+    return `${prefix}${mark === ' ' ? 'x' : ' '}${close}`
+  })
 }

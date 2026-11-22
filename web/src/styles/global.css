@@ -178,3 +178,14 @@ html,body,#app{height:100%}body{overflow:hidden}.app-shell{display:flex;height:1
 .settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
 .settings-hint{margin:12px 0 0;color:var(--color-muted);font-size:12px}
 @media(max-width:600px){.settings-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Detalhes da tarefa renderizados como Markdown (mesmo motor das notas), com checklist clicável.
+   A listinha pode passar de três linhas, então o clamp antigo sai de cena. */
+.task-detail{display:block;white-space:normal;overflow:visible}
+.task-detail p{margin:0 0 4px}
+.task-detail ul,.task-detail ol{margin:2px 0;padding-left:20px}
+.task-detail li{margin:1px 0}
+.task-detail li input[type=checkbox]{accent-color:var(--color-primary);margin:0 6px 0 0;vertical-align:-2px;cursor:pointer}
+.task-detail h1,.task-detail h2,.task-detail h3,.task-detail h4,.task-detail h5,.task-detail h6{margin:6px 0 2px;color:var(--color-text);font:600 13px var(--font-heading)}
+.task-detail code{padding:0 4px;border-radius:4px;background:var(--color-bg);font-family:monospace}
+.task-detail blockquote{margin:2px 0;padding-left:8px;border-left:2px solid var(--color-border-strong);color:var(--color-subtle)}

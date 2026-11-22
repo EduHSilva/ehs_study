@@ -41,6 +41,28 @@ class NoteMarkdownTest {
     }
 
     @Test
+    fun `classifica checklist e alterna pelo indice`() {
+        val markdown = "- [ ] Aula 1\n- [x] **Aula 2**\n1. [ ] Ler"
+        assertEquals(
+            listOf(
+                MarkdownBlock.CheckItem(checked = false, index = 0, text = "Aula 1"),
+                MarkdownBlock.CheckItem(checked = true, index = 1, text = "**Aula 2**"),
+                MarkdownBlock.CheckItem(checked = false, index = 2, text = "Ler"),
+            ),
+            NoteMarkdown.parse(markdown),
+        )
+        assertEquals(
+            "- [x] Aula 1\n- [x] **Aula 2**\n1. [ ] Ler",
+            NoteMarkdown.toggleCheckItem(markdown, 0),
+        )
+        assertEquals(
+            "- [ ] Aula 1\n- [x] **Aula 2**\n1. [x] Ler",
+            NoteMarkdown.toggleCheckItem(markdown, 2),
+        )
+        assertEquals(markdown, NoteMarkdown.toggleCheckItem(markdown, 9))
+    }
+
+    @Test
     fun `junta linhas soltas em um paragrafo`() {
         assertEquals(
             listOf(MarkdownBlock.Paragraph("Primeira linha segunda linha")),

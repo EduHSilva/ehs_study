@@ -93,6 +93,7 @@ export async function deleteFolderQuietly(request: APIRequestContext, token: str
 export interface ApiTask {
   id: string
   title: string
+  details?: string | null
   startDate: string | null
   endDate: string | null
   type: string
@@ -105,6 +106,7 @@ export interface ApiTask {
 
 export interface ApiTaskInput {
   title: string
+  details?: string | null
   startDate: string | null
   endDate: string | null
   type: string

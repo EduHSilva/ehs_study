@@ -8,6 +8,7 @@ import { buildCalendarGrid, canComplete, dayKey, dayKeyFrom, parseDayKey, rangeF
 import { buildTaskStats } from './taskStats'
 import type { TaskStats } from './taskStats'
 import { formatTaskList, isoToLocalInput, localInputToIso } from './taskFormat'
+import { toggleDetailsCheck as toggleCheckText } from './taskDetails'
 import { isRecurringType } from './types'
 import type { Project, ProjectStage } from '../projects/types'
 import type { Task, TaskInput, TaskStatus, TaskType } from './types'
@@ -548,6 +549,29 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     }
   }
 
+  // Checklist dos detalhes: o texto é a fonte da verdade, então a marcação é otimista e manda
+  // só `details` — sem passar pelo formulário de edição.
+  const saveDetails = async (id: string, text: string) => {
+    const current = items.value.find(item => item.id === id) ?? periodTasks.value.find(task => task.id === id)
+    if (!current) return
+    const previous = current.details
+    current.details = text
+    error.value = null
+    try {
+      const saved = await updateTask({ id, details: text })
+      current.details = saved.details
+    } catch {
+      current.details = previous
+      error.value = t('taskSaveFailed')
+    }
+  }
+
+  const toggleDetailsCheck = (id: string, index: number) => {
+    const current = items.value.find(item => item.id === id) ?? periodTasks.value.find(task => task.id === id)
+    if (!current?.details) return
+    void saveDetails(id, toggleCheckText(current.details, index))
+  }
+
   const loadStats = async () => {
     statsLoading.value = true
     statsError.value = null
@@ -643,6 +667,7 @@ const nextStatus = (status: TaskStatus): TaskStatus => (status === 'DONE' ? 'PEN
     jumpTo,
     setMode,
     toggle,
+    toggleDetailsCheck,
     copyTasks,
     remove,
     toggleForm,

@@ -54,17 +54,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.studyflow.app.core.i18n.LocalStrings
@@ -76,6 +70,7 @@ import com.studyflow.app.core.ui.components.ErrorBanner
 import com.studyflow.app.core.ui.components.RefreshableLazyColumn
 import com.studyflow.app.core.ui.components.FieldLabel
 import com.studyflow.app.core.ui.components.LoadingScreen
+import com.studyflow.app.core.ui.components.MarkdownBlocks
 import com.studyflow.app.core.ui.components.PickerField
 import com.studyflow.app.core.ui.components.SegmentedToggle
 import com.studyflow.app.core.ui.components.Subtitle
@@ -104,9 +99,6 @@ private val TASK_TYPES = listOf(
 )
 
 private const val MAX_DETAILS_LENGTH = 2000
-
-// Mesmo formato aceito pelo web: só http(s) vira link, pontuação final fica fora da URL.
-private val DETAILS_URL_REGEX = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -437,6 +429,7 @@ fun TasksScreen() {
                                         state.stagesByProject[pid]?.firstOrNull { it.id == task.stageId }?.name
                                     },
                                     onToggle = { vm.toggle(task.id) },
+                                    onToggleCheck = { index -> vm.toggleDetailsCheck(task.id, index) },
                                     onEdit = { vm.openEdit(task) },
                                     onDelete = { vm.remove(task.id) },
                                 )
@@ -830,27 +823,6 @@ private fun CalendarDayCell(
     }
 }
 
-private fun detailsAnnotated(text: String, linkColor: Color): AnnotatedString = buildAnnotatedString {
-    var cursor = 0
-    for (match in DETAILS_URL_REGEX.findAll(text)) {
-        val raw = match.value
-        val url = raw.trimEnd('.', ',', ';', ':')
-        if (url.isEmpty()) continue
-        append(text.substring(cursor, match.range.first))
-        withLink(
-            LinkAnnotation.Url(
-                url = url,
-                styles = TextLinkStyles(
-                    style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
-                ),
-            ),
-        ) { append(url) }
-        append(raw.substring(url.length))
-        cursor = match.range.last + 1
-    }
-    append(text.substring(cursor))
-}
-
 @Composable
 private fun TaskRow(
     task: Task,
@@ -863,6 +835,7 @@ private fun TaskRow(
     projectName: String?,
     stageName: String?,
     onToggle: () -> Unit,
+    onToggleCheck: (Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -957,12 +930,10 @@ private fun TaskRow(
                     }
                 }
                 task.details?.takeIf { it.isNotBlank() }?.let { details ->
-                    Text(
-                        detailsAnnotated(details, MaterialTheme.colorScheme.primary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StudyFlowTheme.colors.subtle,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
+                    MarkdownBlocks(
+                        markdown = details,
+                        modifier = Modifier.padding(top = 2.dp),
+                        onToggleCheck = onToggleCheck,
                     )
                 }
             }

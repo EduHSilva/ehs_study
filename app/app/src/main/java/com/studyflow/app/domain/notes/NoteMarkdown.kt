@@ -9,6 +9,11 @@ sealed interface MarkdownBlock {
     data class Quote(val text: String) : MarkdownBlock
     data class Code(val code: String) : MarkdownBlock
     data object Divider : MarkdownBlock
+    /**
+     * Item de checklist GFM (`- [ ]` / `- [x]`). O índice é a posição da ocorrência no texto,
+     * usado por [NoteMarkdown.toggleCheckItem] para marcar/desmarcar a linha certa.
+     */
+    data class CheckItem(val checked: Boolean, val index: Int, val text: String) : MarkdownBlock
 }
 
 /** Trecho inline: o texto continua legível mesmo quando a interface não aplica o estilo. */
@@ -23,12 +28,14 @@ sealed interface MarkdownSpan {
 
 /**
  * Subconjunto de Markdown aceito pelo editor de notas, espelhando o que o web renderiza com
- * `marked`: títulos, listas, citação, código, régua e ênfase/links inline.
+ * `marked`: títulos, listas (inclusive checklist), citação, código, régua e ênfase/links inline.
  */
 object NoteMarkdown {
     private val heading = Regex("^(#{1,6})\\s+(.*)$")
     private val ordered = Regex("^(\\d+)[.)]\\s+(.*)$")
     private val bullet = Regex("^[-*+]\\s+(.*)$")
+    private val taskItem = Regex("^(?:[-*+]|\\d+[.)])\\s+\\[([ xX])\\]\\s+(.*)$")
+    private val taskLine = Regex("^(\\s*(?:[-*+]|\\d+[.)])\\s+\\[)([ xX])(\\].*)$")
     private val quote = Regex("^>\\s?(.*)$")
     private val divider = Regex("^([-*_])(\\s*\\1){2,}\\s*$")
     private val whitespace = Regex("\\s+")
@@ -38,6 +45,7 @@ object NoteMarkdown {
         val lines = markdown.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val paragraph = StringBuilder()
         var index = 0
+        var checkIndex = 0
 
         fun flushParagraph() {
             val text = paragraph.toString().trim()
@@ -65,6 +73,7 @@ object NoteMarkdown {
 
                 else -> {
                     val headingMatch = heading.matchEntire(trimmed)
+                    val taskMatch = taskItem.matchEntire(trimmed)
                     val orderedMatch = ordered.matchEntire(trimmed)
                     val bulletMatch = bullet.matchEntire(trimmed)
                     val quoteMatch = quote.matchEntire(trimmed)
@@ -74,6 +83,15 @@ object NoteMarkdown {
                             blocks += MarkdownBlock.Heading(
                                 level = headingMatch.groupValues[1].length,
                                 text = headingMatch.groupValues[2].trim(),
+                            )
+                        }
+
+                        taskMatch != null -> {
+                            flushParagraph()
+                            blocks += MarkdownBlock.CheckItem(
+                                checked = taskMatch.groupValues[1] != " ",
+                                index = checkIndex++,
+                                text = taskMatch.groupValues[2].trim(),
                             )
                         }
 
@@ -132,11 +150,31 @@ object NoteMarkdown {
                     is MarkdownBlock.OrderedItem -> visibleText(block.text)
                     is MarkdownBlock.Quote -> visibleText(block.text)
                     is MarkdownBlock.Code -> block.code
+                    is MarkdownBlock.CheckItem -> visibleText(block.text)
                     MarkdownBlock.Divider -> ""
                 }
             }
             .replace(whitespace, " ")
             .trim()
+
+    /**
+     * Marca/desmarca o item de checklist na posição [index]. Devolve o próprio [markdown] quando
+     * o índice não existe ou o texto não é uma checklist.
+     */
+    fun toggleCheckItem(markdown: String, index: Int): String {
+        val lines = markdown.replace("\r\n", "\n").replace('\r', '\n').split('\n').toMutableList()
+        var current = 0
+        for ((position, line) in lines.withIndex()) {
+            val match = taskLine.matchEntire(line) ?: continue
+            if (current == index) {
+                val mark = if (match.groupValues[2].equals("x", ignoreCase = true)) " " else "x"
+                lines[position] = match.groupValues[1] + mark + match.groupValues[3]
+                return lines.joinToString("\n")
+            }
+            current++
+        }
+        return markdown
+    }
 
     fun inline(text: String): List<MarkdownSpan> {
         val spans = mutableListOf<MarkdownSpan>()

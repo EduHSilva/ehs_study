@@ -80,6 +80,40 @@ test('edita tarefa pela UI, incluindo projeto e etapa, e persiste no back real',
   }
 })
 
+test('marca subtarefa do checklist nos detalhes e persiste no back real', async ({ page, request }) => {
+  const token = await login(request)
+  const start = new Date()
+  const end = new Date(start.getTime() + 2 * 86_400_000)
+  const title = `Checklist E2E ${uniqueSuffix()}`
+  const task = await createTask(request, token, {
+    title,
+    details: '- [ ] Aula 1\n- [ ] Aula 2',
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    type: 'UNIQUE',
+    projectId: null,
+    stageId: null
+  })
+
+  try {
+    await signIn(page)
+    await page.getByRole('button', { name: 'Tarefas' }).click()
+
+    const row = page.locator('.task-line').filter({ hasText: title })
+    const checks = row.locator('.task-detail input[type="checkbox"]')
+    await expect(checks).toHaveCount(2)
+    await expect(checks.nth(1)).not.toBeChecked()
+
+    await checks.nth(1).click()
+    await expect.poll(async () => (await getTask(request, token, task.id)).details)
+      .toBe('- [ ] Aula 1\n- [x] Aula 2')
+    await expect(checks.nth(1)).toBeChecked()
+    await expect(checks.nth(0)).not.toBeChecked()
+  } finally {
+    await deleteTaskQuietly(request, token, task.id)
+  }
+})
+
 test('concluir tarefa única grava e limpa a data de execução no back real', async ({ page, request }) => {
   const token = await login(request)
   const start = new Date()
