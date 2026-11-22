@@ -84,6 +84,7 @@ test('edita a tarefa incluindo projeto e etapa', async ({ page }) => {
   await expect(page.locator('.task-row')).toContainText('Revisar capítulo 3')
   await expect(page.locator('.task-row')).toContainText('Projeto Beta')
   await expect(page.locator('.task-row')).toContainText('Metodologia')
+  await page.locator('.task-view').click()
   await expect(page.locator('.task-detail')).toContainText('Aula 2:')
   await expect(page.locator('.task-form')).toBeHidden()
 })
@@ -93,10 +94,19 @@ test('mostra os detalhes da tarefa com o link clicável', async ({ page }) => {
   await mockApi(page, stateWithTask())
   await openTasks(page)
 
+  const view = page.locator('.task-view')
+  await expect(page.locator('.task-detail')).toHaveCount(0)
+  await view.click()
+  await expect(view).toHaveAttribute('aria-expanded', 'true')
+  await expect(view).toHaveAttribute('aria-label', 'Ocultar detalhes da tarefa')
+
   const detail = page.locator('.task-detail')
   await expect(detail).toContainText('Gravar aula:')
   await expect(detail.getByRole('link', { name: 'https://example.com/aula-1' }))
     .toHaveAttribute('href', 'https://example.com/aula-1')
+
+  await view.click()
+  await expect(page.locator('.task-detail')).toHaveCount(0)
 })
 
 test('marca subtarefas do checklist nos detalhes', async ({ page }) => {
@@ -109,6 +119,7 @@ test('marca subtarefas do checklist nos detalhes', async ({ page }) => {
   await mockApi(page, state)
   await openTasks(page)
 
+  await page.getByRole('button', { name: 'Ver detalhes da tarefa' }).click()
   const checks = page.locator('.task-detail input[type="checkbox"]')
   await expect(checks).toHaveCount(2)
   await expect(checks.nth(0)).not.toBeChecked()

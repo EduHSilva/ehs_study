@@ -189,3 +189,11 @@ html,body,#app{height:100%}body{overflow:hidden}.app-shell{display:flex;height:1
 .task-detail h1,.task-detail h2,.task-detail h3,.task-detail h4,.task-detail h5,.task-detail h6{margin:6px 0 2px;color:var(--color-text);font:600 13px var(--font-heading)}
 .task-detail code{padding:0 4px;border-radius:4px;background:var(--color-bg);font-family:monospace}
 .task-detail blockquote{margin:2px 0;padding-left:8px;border-left:2px solid var(--color-border-strong);color:var(--color-subtle)}
+
+/* Ações da tarefa: ícones quadrados alinhados ao topo, para não esticarem junto com a checklist. */
+.task-line{align-items:flex-start}
+.task-actions{display:flex;gap:8px}
+.task-actions button{width:40px;height:40px;padding:0;display:grid;place-items:center;flex:none}
+.task-view{border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-muted);border-radius:12px;cursor:pointer}
+.task-view:hover,.task-view.open{color:var(--color-primary);border-color:var(--color-primary)}
+.task-view svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}

@@ -27,6 +27,15 @@ const onDetailsClick = (event: MouseEvent, item: Task) => {
   toggleDetailsCheck(item.id, Number(input.dataset.checkIndex))
 }
 
+// Checklist pode ser longa: a linha nasce compacta e o olho abre os detalhes daquela tarefa.
+const openDetails = ref<string[]>([])
+const isDetailsOpen = (id: string) => openDetails.value.includes(id)
+const toggleDetails = (id: string) => {
+  openDetails.value = isDetailsOpen(id)
+    ? openDetails.value.filter(item => item !== id)
+    : [...openDetails.value, id]
+}
+
 const formEl = ref<HTMLFormElement | null>(null)
 const startEdit = async (task: Task) => {
   openEdit(task)
@@ -196,10 +205,15 @@ const taskPeriodLabel = (item: Task): string => {
       <div v-for="item in items" :key="item.id" class="task-line">
         <div class="task-main">
         <button class="task-row" :disabled="savingId === item.id || !canToggle(item)" @click="toggle(item.id)"><span class="checkbox" :class="{checked:isDone(item)}">✓</span><span class="task-info"><strong :class="{done:isDone(item)}">{{ item.title }}</strong><small v-if="taskPeriodLabel(item)">{{ taskPeriodLabel(item) }}</small><small v-if="dailyStats(item)" class="task-stats">{{ dailyStats(item) }}</small></span><span v-if="rowDayLabel(item)" class="task-day" :class="{ today: rowDay(item) === todayKey }">{{ rowDayLabel(item) }}</span><span v-if="projectName(item)" class="tag">{{ projectName(item) }}</span><span v-if="stageName(item)" class="tag">{{ stageName(item) }}</span><span v-if="isRecurringType(item.type)" class="tag daily">{{ typeLabel(item.type) }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button>
-          <div v-if="item.details" class="task-detail" @click="onDetailsClick($event, item)" v-html="renderTaskDetails(item.details)"></div>
+          <div v-if="item.details && isDetailsOpen(item.id)" class="task-detail" @click="onDetailsClick($event, item)" v-html="renderTaskDetails(item.details)"></div>
         </div>
-        <button class="task-edit" :aria-label="t('taskEditAction')" @click="startEdit(item)">✎</button>
-        <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>
+        <div class="task-actions">
+          <button v-if="item.details" class="task-view" :class="{ open: isDetailsOpen(item.id) }" :aria-expanded="isDetailsOpen(item.id)" :aria-label="isDetailsOpen(item.id) ? t('taskDetailsHide') : t('taskDetailsShow')" :title="isDetailsOpen(item.id) ? t('taskDetailsHide') : t('taskDetailsShow')" @click="toggleDetails(item.id)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="task-edit" :aria-label="t('taskEditAction')" @click="startEdit(item)">✎</button>
+          <button class="task-remove" :disabled="deletingId === item.id" :aria-label="t('taskDeleteAction')" @click="remove(item.id)">✕</button>
+        </div>
       </div>
       <button class="floating-add" :aria-expanded="formOpen" @click="toggleForm">＋</button>
     </article>

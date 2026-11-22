@@ -100,6 +100,7 @@ test('marca subtarefa do checklist nos detalhes e persiste no back real', async 
     await page.getByRole('button', { name: 'Tarefas' }).click()
 
     const row = page.locator('.task-line').filter({ hasText: title })
+    await row.getByRole('button', { name: 'Ver detalhes da tarefa' }).click()
     const checks = row.locator('.task-detail input[type="checkbox"]')
     await expect(checks).toHaveCount(2)
     await expect(checks.nth(1)).not.toBeChecked()

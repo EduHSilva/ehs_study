@@ -31,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -840,6 +842,9 @@ private fun TaskRow(
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
+    // Checklist pode ser longa: a linha nasce compacta e o olho abre os detalhes daquela tarefa.
+    var detailsOpen by rememberSaveable(task.id) { mutableStateOf(false) }
+    val hasDetails = task.details?.isNotBlank() == true
     val rowDay = selectedDay
         ?: if (task.type != TaskType.UNIQUE && StudyCalendar.scheduledOn(task, todayKey)) todayKey else ""
     val recurring = task.type != TaskType.UNIQUE
@@ -872,7 +877,7 @@ private fun TaskRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp)),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         Row(
             modifier = Modifier
@@ -930,12 +935,27 @@ private fun TaskRow(
                     }
                 }
                 task.details?.takeIf { it.isNotBlank() }?.let { details ->
-                    MarkdownBlocks(
-                        markdown = details,
-                        modifier = Modifier.padding(top = 2.dp),
-                        onToggleCheck = onToggleCheck,
-                    )
+                    if (detailsOpen) {
+                        MarkdownBlocks(
+                            markdown = details,
+                            modifier = Modifier.padding(top = 2.dp),
+                            onToggleCheck = onToggleCheck,
+                        )
+                    }
                 }
+            }
+        }
+        if (hasDetails) {
+            IconButton(
+                onClick = { detailsOpen = !detailsOpen },
+                modifier = Modifier.size(34.dp),
+            ) {
+                Icon(
+                    if (detailsOpen) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = s[if (detailsOpen) "taskDetailsHide" else "taskDetailsShow"],
+                    tint = if (detailsOpen) MaterialTheme.colorScheme.primary else StudyFlowTheme.colors.subtle,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
         IconButton(onClick = onEdit, enabled = !deleting, modifier = Modifier.size(34.dp)) {
