@@ -206,4 +206,9 @@ const onProjectStatusChange = (id: string, event: Event) => {
 .kanban-status select:disabled{opacity:.6;cursor:default}
 .kanban-column .empty-note{padding:18px 10px;text-align:center}
 @media(max-width:900px){.kanban-board{grid-template-columns:repeat(4,minmax(210px,1fr))}.kanban-board.projects{grid-template-columns:repeat(3,minmax(220px,1fr))}}
+@media(max-width:600px){
+  .kanban-board,.kanban-board.projects{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(82vw,320px);overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;padding-bottom:12px}
+  .kanban-column{scroll-snap-align:start}
+  .kanban-switch{margin-bottom:14px}
+}
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import type { Component } from 'vue'
 import { useAuth, useStudentProfile } from './app/features/auth/useAuth'
 import { currentPage, requestNavigate } from './app/composables/useNavigation'
@@ -51,6 +51,12 @@ const pages: Record<AppPage, Component> = {
 }
 const page = computed(() => pages[currentPage.value])
 
+const menuOpen = ref(false)
+const closeMenu = () => { menuOpen.value = false }
+watch(currentPage, closeMenu)
+
+const brandIcon = `${import.meta.env.BASE_URL}assets/graduation-cap.svg`
+
 // Prefetch sob intenção: passar o mouse (ou focar pelo teclado) no item do menu já busca os
 // dados da tela, então o clique abre o conteúdo em vez de um skeleton.
 const prefetchers: Partial<Record<AppPage, () => void>> = {
@@ -79,7 +85,21 @@ watchEffect(() => {
 
 <template>
   <LandingPage v-if="!isAuthenticated" />
-  <main v-else class="app-shell">
+  <main v-else class="app-shell" :class="{ 'menu-open': menuOpen }">
+    <header class="mobile-topbar">
+      <button
+        class="mobile-menu"
+        type="button"
+        :aria-label="menuOpen ? 'Fechar menu' : 'Abrir menu'"
+        :aria-expanded="menuOpen"
+        @click="menuOpen = !menuOpen"
+      >
+        <svg v-if="!menuOpen" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+      <span class="mobile-brand"><span class="brand-icon"><img :src="brandIcon" alt="" /></span><strong>Estudos</strong></span>
+    </header>
+    <div class="sidebar-scrim" @click="closeMenu" />
     <AppSidebar v-bind="student" :active="currentPage" @navigate="requestNavigate" @prefetch="prefetchPage" />
     <component :is="page" :key="currentPage" @navigate="requestNavigate" />
     <PomodoroWidget />

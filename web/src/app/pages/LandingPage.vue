@@ -133,4 +133,5 @@ const goLogin = () => {
 .forgot-link a{color:var(--color-primary);font-weight:600}
 .landing-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px 26px;font-size:12px;color:var(--color-muted);border-top:1px solid var(--color-border)}
 .landing-footer a{color:var(--color-primary);font-weight:600}
+@media(max-width:600px){.landing-footer{flex-wrap:wrap;justify-content:center;text-align:center;padding:16px 18px 24px}}
 </style>
