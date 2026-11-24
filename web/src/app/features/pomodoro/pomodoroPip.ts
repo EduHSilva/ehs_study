@@ -35,6 +35,7 @@ const THEME_TOKENS = [
   '--color-border',
   '--color-primary',
   '--color-primary-soft',
+  '--color-on-primary',
   '--color-success'
 ]
 
@@ -50,7 +51,7 @@ body{margin:0;background:var(--color-surface);color:var(--color-text);font-famil
 .pip.completed .pip-time{color:var(--color-success)}
 .pip-actions{display:flex;gap:6px;flex-wrap:wrap}
 .pip-btn{height:32px;padding:0 12px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font:600 12px var(--font-body);white-space:nowrap;cursor:pointer}
-.pip-btn.primary{border-color:transparent;background:var(--color-primary);color:#fff}
+.pip-btn.primary{border-color:transparent;background:var(--color-primary);color:var(--color-on-primary)}
 .pip-btn:disabled{opacity:.6;cursor:default}
 `
 

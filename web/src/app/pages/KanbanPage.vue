@@ -184,25 +184,28 @@ const onProjectStatusChange = (id: string, event: Event) => {
 .kanban-switch{display:inline-flex;margin:0 0 20px}
 .kanban-board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:16px;align-items:start;overflow-x:auto;max-width:1420px;padding-bottom:8px}
 .kanban-board.projects{grid-template-columns:repeat(3,minmax(240px,1fr));max-width:1080px}
-.kanban-column{display:grid;align-content:start;gap:12px;min-height:220px;padding:14px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-bg)}
-.kanban-column.delayed{border-color:var(--color-warning);background:var(--color-warning-soft)}
-.kanban-column.done{border-color:var(--color-success);background:var(--color-success-soft)}
-.kanban-column.progress{border-color:var(--color-primary);background:var(--color-primary-soft)}
-.kanban-column-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.kanban-column-head h2{margin:0;font-size:15px}
+.kanban-column{--tone:var(--color-border-strong);display:grid;align-content:start;gap:12px;min-height:240px;padding:14px;border:1px solid var(--color-border);border-radius:16px;background:color-mix(in srgb,var(--color-bg) 55%,var(--color-surface))}
+.kanban-column.progress{--tone:var(--color-primary)}
+.kanban-column.delayed{--tone:var(--color-warning)}
+.kanban-column.done{--tone:var(--color-success)}
+.kanban-column-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 6px}
+.kanban-column-head h2{margin:0;display:flex;align-items:center;gap:8px;font:700 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--color-muted)}
+.kanban-column-head h2:before{content:'';width:8px;height:8px;flex:none;border-radius:50%;background:var(--tone)}
 .kanban-count{display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border:1px solid var(--color-border);border-radius:999px;background:var(--color-surface);color:var(--color-muted);font-size:11px;font-weight:700}
-.kanban-card{display:grid;gap:8px;padding:12px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);cursor:grab;transition:border-color .15s,opacity .15s,box-shadow .15s}
-.kanban-card:hover{border-color:var(--color-border-strong)}
+.kanban-card{display:grid;gap:8px;padding:13px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);cursor:grab;box-shadow:0 1px 2px rgba(46,38,25,.04);transition:border-color .15s,opacity .15s,box-shadow .15s}
+.kanban-card:hover{border-color:var(--color-border-strong);box-shadow:var(--shadow-card)}
 .kanban-card:active{cursor:grabbing}
 .kanban-card.saving{opacity:.6}
 .kanban-card.dragging{opacity:.45;border-style:dashed}
 .kanban-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.kanban-card-head strong{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.kanban-card-head strong{font-size:13.5px;line-height:1.4;overflow-wrap:anywhere}
 .kanban-card-head strong.done{color:var(--color-muted);text-decoration:line-through}
-.kanban-card-meta{margin:0;color:var(--color-muted);font-size:12px;line-height:1.35}
+.kanban-card-meta{margin:0;color:var(--color-muted);font-size:12px;line-height:1.4}
 .kanban-status{display:grid;gap:4px}
-.kanban-status>span{color:var(--color-subtle);font-size:11px;font-weight:600}
-.kanban-status select{width:100%;height:32px;padding:0 8px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-surface);color:var(--color-text);font:500 12px var(--font-body)}
+/* O rótulo fica só para leitores de tela: repetido em cada cartão ele polui o quadro. */
+.kanban-status>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.kanban-status select{width:100%;height:34px;padding:0 10px;border:1px solid var(--color-border);border-radius:9px;background:color-mix(in srgb,var(--color-bg) 45%,var(--color-surface));color:var(--color-text);font:500 12.5px var(--font-body)}
+.kanban-status select:hover{border-color:var(--color-border-strong)}
 .kanban-status select:disabled{opacity:.6;cursor:default}
 .kanban-column .empty-note{padding:18px 10px;text-align:center}
 @media(max-width:900px){.kanban-board{grid-template-columns:repeat(4,minmax(210px,1fr))}.kanban-board.projects{grid-template-columns:repeat(3,minmax(220px,1fr))}}

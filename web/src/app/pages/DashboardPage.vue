@@ -53,7 +53,6 @@ const focusTime = computed(() => {
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
     <PageSkeleton v-if="loading" layout="dashboard" :label="t('dashboardLoading')" />
     <div v-else-if="data" class="dashboard-grid">
-        <div class="left-column">
           <article class="card progress-card"><h2>{{ t('weeklyProgressTitle') }}</h2><div class="progress-content"><div class="progress-ring" :style="{ '--progress': `${progress * 3.6}deg` }"><strong>{{ progress }}%</strong></div><div><p>{{ t('weeklyProgressBefore') }} <b>{{ data.weeklyProgress.completed }} {{ t('of') }} {{ data.weeklyProgress.total }}</b> {{ t('weeklyProgressAfter') }}</p><small>{{ t('weeklyProgressCheer') }}</small></div></div></article>
           <article class="card focus-card"><div class="card-title"><h2>{{ t('focusTitle') }}</h2><span v-if="timerActive" class="tag daily">{{ t('timerActiveTag') }}</span><span v-else class="tag">{{ t('focusTag') }}</span></div>
             <template v-if="timerActive">
@@ -63,11 +62,8 @@ const focusTime = computed(() => {
             </template>
             <template v-else><div class="focus-row"><strong class="focus-time">{{ focusTime }}</strong><div class="focus-meta"><span v-if="focus">{{ focus.title }}</span><small>{{ t('focusMinutes', { minutes: focus?.minutes ?? 0 }) }}</small></div></div><p v-if="!focus" class="empty-note">{{ t('noFocusToday') }}</p><button class="link" @click="$emit('navigate','pomodoro')">{{ t('goToTimer') }}</button></template>
           </article>
-        </div>
-        <div class="right-column">
-          <article class="card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag">{{ t('taskDelayed') }}</span></button></div></article>
+          <article class="card today-card"><div class="card-title"><h2>{{ t('todayTasks') }}</h2><button class="link" @click="$emit('navigate','tasks')">{{ t('seeAll') }}</button></div><div class="task-list"><button v-for="item in tasks" :key="item.id" class="task-row" :disabled="savingTaskId === item.id" @click="toggleTask(item.id)"><span class="checkbox" :class="{ checked: item.status === 'DONE' }">✓</span><span class="task-info"><strong :class="{ done: item.status === 'DONE' }">{{ item.title }}</strong><small>{{ t('endDateLabel') }} {{ formatEndDate(item.endDate) }}</small></span><span v-if="item.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span><span v-if="item.status === 'DELAYED'" class="tag alert">{{ t('taskDelayed') }}</span></button></div></article>
           <article class="card notes"><h2>{{ t('recentNotes') }}</h2><div class="notes-list"><button v-for="note in data.notes" :key="note.id" type="button" class="note" @click="openNote(note.id)"><strong>{{ note.title }}</strong><small v-if="notePreview(note.content)">{{ notePreview(note.content) }}</small></button></div></article>
-        </div>
       </div>
     <p v-else class="empty-note">{{ t('dashboardError') }}</p>
   </section>

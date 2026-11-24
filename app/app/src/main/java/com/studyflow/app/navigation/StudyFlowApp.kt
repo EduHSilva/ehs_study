@@ -51,7 +51,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -294,34 +296,59 @@ private fun StudyFlowDrawer(
         drawerContentColor = Color.White,
         modifier = Modifier.width(300.dp),
     ) {
-        Column(Modifier.fillMaxHeight().padding(20.dp)) {
+        Column(
+            Modifier
+                .fillMaxHeight()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(colors.sidebarTop, colors.sidebar),
+                    ),
+                )                .padding(20.dp),
+        ) {
             BrandMark(dark = true)
             Spacer(Modifier.height(28.dp))
             drawerDestinations.forEach { destination ->
+                val active = currentRoute == destination.route
+                val rowBrush: Brush = if (active) {
+                    Brush.horizontalGradient(
+                        listOf(
+                            colors.sidebarAccent.copy(alpha = 0.20f),
+                            colors.sidebarAccent.copy(alpha = 0.06f),
+                        ),
+                    )
+                } else {
+                    SolidColor(Color.Transparent)
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(40.dp)
-                        .background(
-                            if (currentRoute == destination.route) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            RoundedCornerShape(8.dp),
-                        )
+                        .background(rowBrush, RoundedCornerShape(8.dp))
                         .clickable { onNavigate(destination.route) }
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    Box(
+                        Modifier
+                            .width(3.dp)
+                            .height(16.dp)
+                            .background(
+                                if (active) colors.sidebarAccent else Color.Transparent,
+                                RoundedCornerShape(2.dp),
+                            ),
+                    )
                     Icon(
                         destination.icon,
                         contentDescription = null,
-                        tint = if (currentRoute == destination.route) Color.White else colors.sidebarText,
+                        tint = if (active) Color.White else colors.sidebarText,
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
                         s[destination.labelKey],
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (currentRoute == destination.route) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (currentRoute == destination.route) Color.White else colors.sidebarText,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (active) Color.White else colors.sidebarText,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -332,7 +359,12 @@ private fun StudyFlowDrawer(
             HorizontalDivider(color = Color.White.copy(alpha = 0.13f))
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                InitialAvatar(name = user.name, size = 38.dp)
+                InitialAvatar(
+                    name = user.name,
+                    size = 38.dp,
+                    background = colors.sidebarAccent,
+                    contentColor = colors.sidebarOnAccent,
+                )
                 Column {
                     Text(
                         user.name.ifBlank { s["studentFallback"] },

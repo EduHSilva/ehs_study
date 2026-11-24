@@ -158,7 +158,7 @@ const dropNoteOnFolder = async (folderId: string) => {
         <p v-if="!folders.length && !error" class="empty-note">{{ t('noFolders') }}</p>
         <div v-for="folder in folders" :key="folder.id" class="folder-row">
           <form v-if="editingFolderId===folder.id" class="folder-rename" @submit.prevent="saveFolderName(folder.id)"><input v-model="folderName" aria-label="Nome da pasta" maxlength="100"/><button class="link" type="submit">Salvar</button><button class="link" type="button" @click="editingFolderId=null">Cancelar</button></form>
-          <template v-else><button class="folder" :class="{selected:folder.id===selectedFolderId, 'drop-target': draggingNoteId !== null && folder.id !== selectedFolderId}" @click="chooseFolder(folder.id)" @dragover.prevent @drop.prevent="dropNoteOnFolder(folder.id)">▰ <span class="folder-name">{{folder.name}}</span><small v-if="folder.notes.length" class="folder-count">{{ folder.notes.length }}</small></button><button class="link rename-folder" aria-label="Renomear pasta" @click="beginRename(folder)">✎</button></template>
+          <template v-else><button class="folder" :class="{selected:folder.id===selectedFolderId, 'drop-target': draggingNoteId !== null && folder.id !== selectedFolderId}" @click="chooseFolder(folder.id)" @dragover.prevent @drop.prevent="dropNoteOnFolder(folder.id)"><svg class="folder-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.6l1.6 1.8h7.8a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z"/></svg><span class="folder-name">{{folder.name}}</span><small v-if="folder.notes.length" class="folder-count">{{ folder.notes.length }}</small></button><button class="link rename-folder" aria-label="Renomear pasta" @click="beginRename(folder)">✎</button></template>
         </div>
         <button v-if="selectedFolderId" class="link danger folder-delete" @click="removeFolder(selectedFolderId)">{{ t('deleteFolderAction') }}</button>
       </article>
@@ -222,7 +222,7 @@ const dropNoteOnFolder = async (folderId: string) => {
 .rename-folder{padding:6px}
 .folder-rename{display:flex;gap:4px;width:100%}
 .folder-rename input{min-width:0;flex:1}
-.editor-heading{margin-bottom:12px}
+.editor-heading{padding:20px 24px 0;margin-bottom:12px}
 .editor-title{min-width:0}
 .editor-title small{display:block;margin-top:2px;color:var(--color-muted);font-size:12px}
 .note-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:10px;max-height:264px;padding:0 24px 20px;overflow:auto}

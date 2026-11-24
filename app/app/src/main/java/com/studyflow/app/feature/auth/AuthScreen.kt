@@ -332,17 +332,19 @@ fun AuthScreen() {
 
 @Composable
 fun BrandMark(dark: Boolean = false) {
+    val badgeColor = if (dark) StudyFlowTheme.colors.sidebarAccent else MaterialTheme.colorScheme.primary
+    val badgeContent = if (dark) StudyFlowTheme.colors.sidebarOnAccent else MaterialTheme.colorScheme.onPrimary
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.primary,
+            color = badgeColor,
             modifier = Modifier.size(32.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.School,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = badgeContent,
                     modifier = Modifier.size(19.dp),
                 )
             }

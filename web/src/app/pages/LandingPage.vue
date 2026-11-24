@@ -70,7 +70,7 @@ const goLogin = () => {
           <div class="password-field">
             <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••" minlength="6" required />
             <button class="password-peek" type="button" :aria-label="showPassword ? t('hidePassword') : t('showPassword')" :title="showPassword ? t('hidePassword') : t('showPassword')" @click="showPassword = !showPassword">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path v-if="showPassword" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7 0 .9-.6 2.1-1.7 3.2M6.2 6.7C4.2 8 3 9.8 3 12c0 2.5 4 7 9 7 1.3 0 2.5-.3 3.5-.8"/><circle v-if="!showPassword" cx="12" cy="12" r="3"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><template v-if="showPassword"><path d="M3 3l18 18M10.4 6.1A10.7 10.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17.6 17.6 0 0 1-2.6 3.3M6.3 7.6A16.9 16.9 0 0 0 2.5 12S6 18 12 18c1.3 0 2.5-.2 3.6-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></template><template v-else><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/></template></svg>
             </button>
           </div>
         </label>
@@ -105,7 +105,7 @@ const goLogin = () => {
           <div class="password-field">
             <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="••••••••" minlength="6" required />
             <button class="password-peek" type="button" :aria-label="showPassword ? t('hidePassword') : t('showPassword')" :title="showPassword ? t('hidePassword') : t('showPassword')" @click="showPassword = !showPassword">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path v-if="showPassword" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7 0 .9-.6 2.1-1.7 3.2M6.2 6.7C4.2 8 3 9.8 3 12c0 2.5 4 7 9 7 1.3 0 2.5-.3 3.5-.8"/><circle v-if="!showPassword" cx="12" cy="12" r="3"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><template v-if="showPassword"><path d="M3 3l18 18M10.4 6.1A10.7 10.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17.6 17.6 0 0 1-2.6 3.3M6.3 7.6A16.9 16.9 0 0 0 2.5 12S6 18 12 18c1.3 0 2.5-.2 3.6-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></template><template v-else><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/></template></svg>
             </button>
           </div>
         </label>

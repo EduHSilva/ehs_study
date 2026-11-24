@@ -55,13 +55,13 @@ const submit = () => { void updateProfile(name.value) }
 <style scoped>
 .profile-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;max-width:640px}
 .profile-card{padding:0;overflow:hidden}
-.profile-hero{display:flex;align-items:center;gap:16px;padding:24px;background:linear-gradient(135deg,var(--color-primary-soft),transparent)}
-.avatar-lg{width:64px;height:64px;border-radius:50%;background:var(--color-primary);color:#fff;display:grid;place-items:center;font:700 26px var(--font-heading)}
+.profile-hero{display:flex;align-items:center;gap:16px;padding:24px;background:linear-gradient(135deg,color-mix(in srgb,var(--color-primary-soft) 75%,var(--color-surface)),var(--color-surface) 70%)}
+.avatar-lg{width:64px;height:64px;border-radius:50%;background:var(--color-primary-soft);color:var(--color-primary);display:grid;place-items:center;font:600 26px var(--font-heading);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 25%,transparent)}
 .profile-hero div{display:grid;gap:2px}
-.profile-hero strong{font:600 18px var(--font-heading)}
+.profile-hero strong{font:600 19px var(--font-heading)}
 .profile-hero span{color:var(--color-muted);font-size:13px}
 .profile-form{display:grid;gap:14px;padding:24px}
-.profile-form .button{width:100%;border-radius:8px;height:42px;font-weight:600}
+.profile-form .button{width:100%;height:42px;font-weight:600}
 .form-success{margin:0;padding:10px 12px;border-radius:8px;background:var(--color-success-soft);color:var(--color-success);font-size:13px}
 .field input:disabled{background:var(--color-bg);color:var(--color-muted)}
 </style>

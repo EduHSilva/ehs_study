@@ -138,12 +138,12 @@ const saveVersion = async (id: string) => {
 }
 </script>
 <template>
-  <section class="content"><header class="page-header"><div><h1>{{ t('projectsTitle') }}</h1><p>{{ t('projectsSubtitle') }}</p><p>{{ t('projectsHint') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
+  <section class="content"><header class="page-header"><div><h1>{{ t('projectsTitle') }}</h1><p>{{ t('projectsSubtitle') }}</p></div><div class="header-actions"><LanguageToggle/><ThemeToggle/></div></header>
     <p v-if="error" class="sync-error">{{ error }} <button @click="load">{{ t('retry') }}</button></p>
     <PageSkeleton v-if="loading" layout="split" :label="t('projectsLoading')" />
     <div v-else class="projects-layout">
       <article class="card project-list">
-        <div class="card-title"><h2>{{ t('myProjects') }}</h2><button v-if="!creatingProject" class="button" @click="creatingProject=true">＋ {{ t('newProject') }}</button></div>
+        <div class="card-title"><h2>{{ t('myProjects') }}</h2></div>
         <form v-if="creatingProject" class="project-create-form" @submit.prevent="submitProject">
           <label>{{ t('projectTitleLabel') }}<input v-model="projectTitle" :placeholder="t('projectTitlePlaceholder')" required maxlength="200" /></label>
           <label>{{ t('projectAdvisorLabel') }}<input v-model="projectAdvisor" :placeholder="t('projectAdvisorPlaceholder')" maxlength="200" /></label>
@@ -151,6 +151,7 @@ const saveVersion = async (id: string) => {
         </form>
         <p v-if="!projects.length && !error" class="empty-note">{{ t('noProjects') }}</p>
         <button v-for="project in projects" :key="project.id" class="project" :class="{selected:project.id===selectedId}" @click="selectProject(project.id)"><div class="project-heading"><strong>{{project.title}}</strong><em v-if="project.status === 'Concluído'" class="project-done-tag">{{ t('projectStatusDone') }}</em></div><span><i :style="{width:`${project.progress}%`}"/></span><small>{{ t('percentCompleted', { progress: project.progress }) }}</small></button>
+        <button v-if="!creatingProject" class="project-new" @click="creatingProject=true">＋ {{ t('newProject') }}</button>
       </article>
       <article v-if="details" class="card project-details">
         <div class="card-title"><div><h2>{{details.project.title}}</h2><p>{{ t('advisorLabel') }} {{details.project.advisor || t('noAdvisor')}}</p></div><span class="priority" :class="statusClass(details.project.status)">{{ statusLabel(details.project.status) }}</span></div>
@@ -229,8 +230,11 @@ const saveVersion = async (id: string) => {
 </template>
 <style scoped>
 .project-create-form{display:grid;gap:12px;padding:12px 0}
+.project-new{width:100%;height:38px;margin-top:14px;border:1px dashed var(--color-border-strong);border-radius:10px;background:transparent;color:var(--color-primary);font:600 12.5px var(--font-body);cursor:pointer;transition:background .15s,border-color .15s}
+.project-new:hover{background:var(--color-primary-soft);border-color:var(--color-primary)}
 .project-create-form label{display:grid;gap:6px;color:var(--color-muted);font-size:13px}
-.project-create-form input{width:100%;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text)}
+.project-create-form input{width:100%;height:40px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:10px;background:var(--color-surface);color:var(--color-text);font:400 14px var(--font-body)}
+.project-create-form input:focus-visible{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 18%,transparent);outline:none}
 .project-create-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px}
 .project-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .project-actions .chip:disabled{opacity:.55;cursor:default}
@@ -239,22 +243,26 @@ const saveVersion = async (id: string) => {
 .delete-confirm{color:var(--color-danger);font-size:13px}
 .project-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
 .project-heading strong{overflow:hidden;text-overflow:ellipsis}
-.project-done-tag{flex:none;padding:2px 8px;border-radius:999px;background:var(--color-primary-soft);color:var(--color-primary);font-style:normal;font-size:11px;font-weight:600}
+.project-done-tag{flex:none;padding:2px 8px;border-radius:6px;background:var(--color-success-soft);color:var(--color-success);font-style:normal;font-size:11px;font-weight:600}
+.priority{padding:3px 10px;border-radius:999px;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-muted);font:600 11.5px var(--font-body);white-space:nowrap}
+.priority.média{border-color:transparent;background:var(--color-primary-soft);color:var(--color-primary)}
+.priority.baixa{border-color:transparent;background:var(--color-success-soft);color:var(--color-success)}
 .project-item-create{display:flex;gap:8px;margin:10px 0 18px;flex-wrap:wrap}
-.project-item-create input{min-width:0;flex:1;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text)}
+.project-item-create input{min-width:0;flex:1;height:40px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:10px;background:var(--color-surface);color:var(--color-text);font:400 14px var(--font-body)}
+.project-item-create input:focus-visible{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 18%,transparent);outline:none}
 .version-create input[type="datetime-local"]{flex:0 1 220px}
 .stage-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0}
 .stage-heading h3{margin:0}
 .stages-toolbar{display:flex;gap:8px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--color-border-strong);border-radius:999px;background:var(--color-surface);color:var(--color-muted);font:600 12px var(--font-body);cursor:pointer}
-.chip:hover{border-color:var(--color-primary);color:var(--color-primary)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:10px;background:var(--color-surface);color:var(--color-muted);font:600 12px var(--font-body);cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.chip:hover{border-color:var(--color-primary);color:var(--color-primary);background:var(--color-primary-soft)}
 .chip.active{border-color:transparent;background:var(--color-primary-soft);color:var(--color-primary)}
 .chip small{display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--color-bg);color:inherit;font-size:11px}
 .stage-hidden-hint{margin:0 0 8px;color:var(--color-muted);font-size:12px}
 .stage-item{margin-bottom:10px;border:1px solid var(--color-border);border-radius:12px;overflow:hidden}
 .stage-row{display:flex;align-items:center;gap:4px;padding:4px 8px 4px 4px}
 .stage-check{flex:none;width:26px;height:26px;border:2px solid var(--color-border-strong);border-radius:7px;background:transparent;color:transparent;font-size:13px;cursor:pointer}
-.stage-check.checked{border-color:var(--color-success);background:var(--color-success);color:#fff}
+.stage-check.checked{border-color:var(--color-success);background:var(--color-success);color:var(--color-on-primary)}
 .stage-check:disabled{opacity:.55;cursor:default}
 .stage-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:8px 6px;border:0;background:transparent;color:var(--color-text);font:500 14px var(--font-body);text-align:left;cursor:pointer}
 .stage-toggle:hover .stage-name{color:var(--color-primary)}

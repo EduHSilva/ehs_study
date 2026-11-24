@@ -203,17 +203,23 @@ fun ProgressRing(
 }
 
 @Composable
-fun InitialAvatar(name: String, size: Dp = 40.dp, modifier: Modifier = Modifier) {
+fun InitialAvatar(
+    name: String,
+    size: Dp = 40.dp,
+    modifier: Modifier = Modifier,
+    background: Color? = null,
+    contentColor: Color? = null,
+) {
     val initials = rememberInitials(name)
     Box(
         modifier = modifier
             .size(size)
-            .background(MaterialTheme.colorScheme.primary, CircleShape),
+            .background(background ?: MaterialTheme.colorScheme.primary, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = initials,
-            color = MaterialTheme.colorScheme.onPrimary,
+            color = contentColor ?: MaterialTheme.colorScheme.onPrimary,
             style = if (size >= 56.dp) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.labelLarge,
         )
     }
@@ -245,7 +251,7 @@ fun CheckSquare(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 20.d
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {
-            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.7f))
+            Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondary, modifier = Modifier.size(size * 0.7f))
         }
     }
 }

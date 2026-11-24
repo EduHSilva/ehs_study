@@ -192,7 +192,15 @@ test('a janela flutuante acompanha o tema escuro', async ({ page }) => {
     const win = api?.window
     return win ? win.getComputedStyle(win.document.body).backgroundColor : ''
   })
-  await expect.poll(pipBackground).toBe('rgb(39, 39, 42)')
+  const appSurface = await page.evaluate(() => {
+    const probe = document.createElement('div')
+    probe.style.background = 'var(--color-surface)'
+    document.body.append(probe)
+    const value = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return value
+  })
+  await expect.poll(pipBackground).toBe(appSurface)
 })
 
 test('toca o alerta sonoro quando o ciclo termina', async ({ page }) => {
