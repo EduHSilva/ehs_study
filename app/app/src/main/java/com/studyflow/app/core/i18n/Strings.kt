@@ -246,7 +246,8 @@ private val ptBr: Map<String, String> = mapOf(
     "taskWeeklyGoalProgress" to "{done}/{goal} nesta semana",
 
     "projectsSubtitle" to "Organize etapas, versões e tarefas de qualquer projeto ou curso em um só lugar.",
-    "projectsHint" to "Etapas mostram o andamento, versões marcam entregas com prazo e as tarefas de cada etapa ficam vinculadas ao projeto ou curso.",
+    "projectsHint" to "Etapas e tarefas mostram o andamento, versões marcam entregas com prazo e as tarefas de cada etapa ficam vinculadas ao projeto ou curso.",
+    "projectProgressHint" to "O progresso soma etapas e tarefas: cada etapa e cada tarefa valem um item, e tarefas pendentes seguram o percentual.",
     "myProjects" to "Meus projetos e cursos",
     "newProject" to "Novo projeto ou curso",
     "createProject" to "Cadastrar projeto ou curso",
@@ -636,7 +637,8 @@ private val en: Map<String, String> = mapOf(
     "taskWeeklyGoalProgress" to "{done}/{goal} this week",
 
     "projectsSubtitle" to "Organize stages, versions and tasks for any project or course in one place.",
-    "projectsHint" to "Stages show progress, versions mark deliveries with deadlines, and each stage lists its tasks linked to the project or course.",
+    "projectsHint" to "Stages and tasks show progress, versions mark deliveries with deadlines, and each stage lists its tasks linked to the project or course.",
+    "projectProgressHint" to "Progress combines stages and tasks: each stage and each task counts as one item, and pending tasks hold the percentage back.",
     "myProjects" to "My projects & courses",
     "newProject" to "New project or course",
     "createProject" to "Create project or course",

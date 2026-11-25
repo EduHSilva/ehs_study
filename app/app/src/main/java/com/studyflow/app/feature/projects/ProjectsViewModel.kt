@@ -238,7 +238,7 @@ class ProjectDetailViewModel(
             try {
                 val saved = projectsRepository.updateStage(projectId, stageId, stage.name, !stage.done)
                 updateStages { stages -> stages.map { if (it.id == saved.id) saved else it } }
-                syncProgress()
+                applyStageProgress(saved.projectProgress)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -258,7 +258,7 @@ class ProjectDetailViewModel(
             try {
                 val stage = projectsRepository.createStage(projectId, trimmed)
                 updateStages { it + stage }
-                syncProgress()
+                applyStageProgress(stage.projectProgress)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -319,12 +319,9 @@ class ProjectDetailViewModel(
         }
     }
 
-    private fun syncProgress() {
-        _state.update { current ->
-            val details = current.details ?: return@update current
-            val total = details.stages.size
-            val progress = if (total == 0) 0 else Math.round(details.stages.count { it.done }.toFloat() / total * 100)
-            current.copy(details = details.copy(project = details.project.copy(progress = progress)))
-        }
+    // O progresso é calculado no back; a etapa recém-salva devolve o valor já atualizado.
+    private fun applyStageProgress(projectProgress: Int?) {
+        if (projectProgress == null) return
+        updateDetails { it.copy(project = it.project.copy(progress = projectProgress)) }
     }
 }

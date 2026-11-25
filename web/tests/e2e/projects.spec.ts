@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { mockApi, signIn } from './support/mockApi'
+import type { MockTask } from './support/mockApi'
 
 const PROJECT = {
   id: 'project-1',
@@ -26,6 +27,79 @@ test('carrega os projetos pelo prefixo /study', async ({ page }) => {
   await expect(page.getByRole('button', { name: /TCC: História do Brasil/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Introdução/ })).toBeVisible()
   await expect(page.getByText('Entrega do capítulo 1')).toBeVisible()
+})
+
+test('exibe o progresso calculado pelo back', async ({ page }) => {
+  const project = {
+    id: 'project-1',
+    title: 'TCC: História do Brasil',
+    status: 'WORKING',
+    progress: 75,
+    advisor: 'Prof. Silva',
+    stages: [
+      { id: 'stage-1', name: 'Introdução', done: true },
+      { id: 'stage-2', name: 'Metodologia', done: true },
+      { id: 'stage-3', name: 'Resultados', done: false }
+    ],
+    versions: []
+  }
+  const doneTask: MockTask = {
+    id: 'task-1',
+    title: 'Ler capítulo 1',
+    type: 'UNIQUE',
+    status: 'DONE',
+    projectId: 'project-1',
+    stageId: 'stage-1',
+    dailyStatistics: null,
+    dailyCompletions: []
+  }
+  const pendingTask: MockTask = {
+    id: 'task-2',
+    title: 'Escrever metodologia',
+    type: 'UNIQUE',
+    status: 'PENDING',
+    projectId: 'project-1',
+    stageId: 'stage-2',
+    dailyStatistics: null,
+    dailyCompletions: []
+  }
+  await signIn(page)
+  await mockApi(page, {
+    folders: [],
+    projects: [project],
+    projectDetails: { 'project-1': project },
+    tasks: [doneTask, pendingTask]
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+
+  // 3 etapas (2 concluídas) + 2 tarefas (1 concluída) dariam 60% no front; o valor exibido é o do back.
+  await expect(page.getByText('75% Concluído')).toBeVisible()
+})
+
+test('aplica o progresso devolvido pelo back ao concluir etapa', async ({ page }) => {
+  const project = {
+    id: 'project-1',
+    title: 'TCC: História do Brasil',
+    status: 'WORKING',
+    progress: 25,
+    advisor: 'Prof. Silva',
+    stages: [{ id: 'stage-1', name: 'Introdução', done: false, projectProgress: 80 }],
+    versions: []
+  }
+  await signIn(page)
+  await mockApi(page, {
+    folders: [],
+    projects: [project],
+    projectDetails: { 'project-1': project }
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+  await page.getByRole('button', { name: 'Marcar etapa como concluída' }).click()
+
+  await expect(page.getByText('80% Concluído')).toBeVisible()
 })
 
 const PROJECT_WITH_HISTORY = {

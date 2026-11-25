@@ -148,13 +148,13 @@ export function useProjects() {
     tasksLoading.value = false
   }
 
-  const syncProgress = () => {
-    if (!details.value) return
-    const total = details.value.stages.length
-    const progress = total ? Math.round(details.value.stages.filter(stage => stage.done).length / total * 100) : 0
-    details.value.project.progress = progress
+  // O progresso é calculado no back; a etapa recém-salva devolve o valor já atualizado para o
+  // painel e para a lista, sem recalcular no front.
+  const applyStageProgress = (projectProgress: number | undefined) => {
+    if (projectProgress === undefined || !details.value) return
+    details.value.project.progress = projectProgress
     const listProject = projects.value.find(project => project.id === details.value?.project.id)
-    if (listProject) listProject.progress = progress
+    if (listProject) listProject.progress = projectProgress
   }
 
   const createProject = async (title: string, advisor: string) => {
@@ -251,8 +251,9 @@ export function useProjects() {
     if (!stage) return
     savingStageId.value = stageId
     try {
-      Object.assign(stage, await updateStage(selectedId.value, stageId, stage.name, !stage.done))
-      syncProgress()
+      const saved = await updateStage(selectedId.value, stageId, stage.name, !stage.done)
+      Object.assign(stage, saved)
+      applyStageProgress(saved.projectProgress)
     } catch {
       error.value = t('stageSaveFailed')
     } finally {
@@ -267,7 +268,7 @@ export function useProjects() {
     try {
       const stage = await createStageRequest(selectedId.value, title.trim())
       details.value.stages.push(stage)
-      syncProgress()
+      applyStageProgress(stage.projectProgress)
       return true
     } catch {
       error.value = t('stageCreateFailed')

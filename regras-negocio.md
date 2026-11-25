@@ -62,8 +62,14 @@
 - O mesmo cadastro atende projetos e cursos; não há campo de tipo e os textos da UI dizem
   "projeto ou curso".
 - Projeto ou curso tem título, status, orientador, etapas e versões.
-- Etapa tem nome e "concluída"; o progresso do projeto é o percentual de etapas
-  concluídas (inteiro; 0 quando não há etapas).
+- Etapa tem nome e "concluída". O progresso do projeto considera etapas e tarefas: é o
+  percentual inteiro de `(etapas concluídas + tarefas concluídas) / (etapas + tarefas)`, então
+  uma tarefa pendente segura o percentual mesmo com a etapa já concluída. Recorrentes contam
+  como concluídas quando o dia atual está concluído. Sem etapas nem tarefas, o progresso é 0.
+- O progresso é calculado no serviço `study` (consulta as tarefas do usuário no serviço de
+  tarefas); o web e o Android só exibem o valor devolvido pela API. A listagem, o detalhe e a
+  criação/edição de etapa devolvem o percentual atualizado (`projectProgress` na etapa). Se o
+  serviço de tarefas estiver indisponível, o progresso cai para as etapas concluídas.
 - Versão tem título e prazo; no app Android o prazo é sinalizado como `OVERDUE` quando já
   passou e `SOON` até 3 dias.
 - Ordenação de tarefas por status (aguardando → em andamento → concluída) e depois nome.

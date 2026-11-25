@@ -137,6 +137,7 @@ object Mappers {
         id = dto.id,
         name = dto.name ?: dto.title.orEmpty(),
         done = dto.done == true,
+        projectProgress = dto.projectProgress,
     )
 
     fun version(dto: VersionDto): ProjectVersion = ProjectVersion(

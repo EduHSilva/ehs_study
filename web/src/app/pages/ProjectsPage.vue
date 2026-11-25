@@ -144,6 +144,7 @@ const saveVersion = async (id: string) => {
     <div v-else class="projects-layout">
       <article class="card project-list">
         <div class="card-title"><h2>{{ t('myProjects') }}</h2></div>
+        <p class="progress-hint">{{ t('projectProgressHint') }}</p>
         <form v-if="creatingProject" class="project-create-form" @submit.prevent="submitProject">
           <label>{{ t('projectTitleLabel') }}<input v-model="projectTitle" :placeholder="t('projectTitlePlaceholder')" required maxlength="200" /></label>
           <label>{{ t('projectAdvisorLabel') }}<input v-model="projectAdvisor" :placeholder="t('projectAdvisorPlaceholder')" maxlength="200" /></label>
@@ -229,6 +230,7 @@ const saveVersion = async (id: string) => {
   </section>
 </template>
 <style scoped>
+.progress-hint{margin:8px 0 0;color:var(--color-muted);font-size:12px;line-height:1.45}
 .project-create-form{display:grid;gap:12px;padding:12px 0}
 .project-new{width:100%;height:38px;margin-top:14px;border:1px dashed var(--color-border-strong);border-radius:10px;background:transparent;color:var(--color-primary);font:600 12.5px var(--font-body);cursor:pointer;transition:background .15s,border-color .15s}
 .project-new:hover{background:var(--color-primary-soft);border-color:var(--color-primary)}

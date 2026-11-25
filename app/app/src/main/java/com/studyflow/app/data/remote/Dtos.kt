@@ -217,6 +217,7 @@ data class StageDto(
     val name: String? = null,
     val title: String? = null,
     val done: Boolean? = null,
+    val projectProgress: Int? = null,
 )
 
 @Serializable

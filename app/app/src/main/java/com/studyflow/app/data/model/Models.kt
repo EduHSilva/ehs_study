@@ -108,7 +108,7 @@ data class Project(
     val advisor: String,
 )
 
-data class ProjectStage(val id: String, val name: String, val done: Boolean)
+data class ProjectStage(val id: String, val name: String, val done: Boolean, val projectProgress: Int? = null)
 
 data class ProjectVersion(val id: String, val title: String, val dueDate: String)
 

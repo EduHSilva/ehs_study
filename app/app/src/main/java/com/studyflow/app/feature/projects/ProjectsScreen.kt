@@ -166,6 +166,12 @@ fun ProjectsScreen(onOpenProject: (String) -> Unit) {
                         }
                     },
                 )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    s["projectProgressHint"],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = StudyFlowTheme.colors.subtle,
+                )
                 Spacer(Modifier.height(12.dp))
                 if (state.projects.isEmpty()) {
                     EmptyNote(s["noProjects"])

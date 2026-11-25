@@ -15,6 +15,7 @@ interface ProjectStagePayload {
   name?: string
   title?: string
   done: boolean
+  projectProgress?: number | null
 }
 
 interface ProjectPayload {
@@ -101,7 +102,12 @@ export async function createStage(projectId: string, title: string): Promise<Pro
     method: 'POST',
     body: JSON.stringify({ idProject: projectId, title, done: false })
   }))
-  return { id: payload.id, name: payload.name ?? payload.title ?? title, done: payload.done === true }
+  return {
+    id: payload.id,
+    name: payload.name ?? payload.title ?? title,
+    done: payload.done === true,
+    projectProgress: payload.projectProgress ?? undefined
+  }
 }
 
 export async function createVersion(projectId: string, title: string, dueDate: string): Promise<ProjectVersionPayload> {
@@ -116,7 +122,12 @@ export async function updateStage(projectId: string, stageId: string, title: str
     method: 'PUT',
     body: JSON.stringify({ idProject: projectId, title, done })
   }))
-  return { id: payload.id, name: payload.name ?? payload.title ?? title, done: payload.done === true }
+  return {
+    id: payload.id,
+    name: payload.name ?? payload.title ?? title,
+    done: payload.done === true,
+    projectProgress: payload.projectProgress ?? undefined
+  }
 }
 
 export async function updateVersion(projectId: string, versionId: string, title: string, dueDate: string): Promise<ProjectVersionPayload> {
