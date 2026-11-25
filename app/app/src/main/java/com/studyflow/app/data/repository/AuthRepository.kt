@@ -1,6 +1,8 @@
 package com.studyflow.app.data.repository
 
 import com.studyflow.app.core.network.ApiException
+import com.studyflow.app.core.network.EmailConfirmationRequiredException
+import com.studyflow.app.core.network.Envelope
 import com.studyflow.app.core.network.unwrap
 import com.studyflow.app.core.session.AuthSession
 import com.studyflow.app.core.session.AuthUser
@@ -21,15 +23,15 @@ class AuthRepository(
     val session = sessionManager.session
 
     suspend fun login(email: String, password: String): AuthSession =
-        saveSession(
+        sessionFrom(
             api.login(
                 LoginRequest(email = email.trim(), password = password, app = APP_SCOPE),
-            ).unwrap(),
+            ),
         )
 
     /** Mesmo endpoint; o back aceita `tokenGmail` no lugar de e-mail/senha. */
     suspend fun loginWithGoogle(idToken: String): AuthSession =
-        saveSession(api.login(LoginRequest(tokenGmail = idToken, app = APP_SCOPE)).unwrap())
+        sessionFrom(api.login(LoginRequest(tokenGmail = idToken, app = APP_SCOPE)))
 
     suspend fun register(email: String, username: String, password: String) {
         api.register(
@@ -74,6 +76,14 @@ class AuthRepository(
     }
 
     fun logout() = sessionManager.expire()
+
+    private fun sessionFrom(envelope: Envelope<LoginDto>): AuthSession {
+        val dto = envelope.data
+            ?: throw EmailConfirmationRequiredException(
+                envelope.message ?: "Enviamos as instruções de acesso para o seu e-mail.",
+            )
+        return saveSession(dto)
+    }
 
     private fun saveSession(dto: LoginDto): AuthSession {
         val token = dto.token ?: throw ApiException("Login sem token")

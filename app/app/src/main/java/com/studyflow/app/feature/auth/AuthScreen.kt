@@ -250,6 +250,32 @@ fun AuthScreen() {
                         ErrorBanner(message = s[errorKey])
                     }
 
+                    val noticeKey = if (mode == AuthMode.LOGIN) state.noticeKey else null
+                    if (noticeKey != null) {
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(StudyFlowTheme.colors.successSoft, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = StudyFlowTheme.colors.success,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                text = s[noticeKey],
+                                color = StudyFlowTheme.colors.success,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(18.dp))
                     Button(
                         onClick = submit,

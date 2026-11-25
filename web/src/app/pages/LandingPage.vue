@@ -7,7 +7,7 @@ import { useI18n } from '../composables/useI18n'
 import { useAuth } from '../features/auth/useAuth'
 
 const { t } = useI18n()
-const { pending, error, login, loginWithGoogle, register, registerPending, registerError, registerSuccess } = useAuth()
+const { pending, error, emailSent, login, loginWithGoogle, register, registerPending, registerError, registerSuccess } = useAuth()
 
 const mode = ref<'login' | 'register'>('login')
 const email = ref('')
@@ -34,6 +34,7 @@ const switchMode = (next: 'login' | 'register') => {
   mode.value = next
   // A senha fica em claro ao trocar de aba, e o botão do Google vive no formulário de login.
   showPassword.value = false
+  emailSent.value = null
 }
 
 const goLogin = () => {
@@ -75,6 +76,7 @@ const goLogin = () => {
           </div>
         </label>
         <p class="forgot-link"><a href="/user/reset-password">{{ t('forgotPassword') }}</a></p>
+        <p v-if="emailSent" class="form-success">{{ emailSent }}</p>
         <p v-if="error" class="form-error">{{ error }}</p>
         <button class="button" type="submit" :disabled="pending">{{ pending ? t('loggingIn') : t('loginAction') }}</button>
         <template v-if="googleEnabled || googleFailed">

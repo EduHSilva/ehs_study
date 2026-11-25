@@ -19,4 +19,10 @@ class ApiException(
     val status: Int? = null,
 ) : Exception(message)
 
+/**
+ * `login` responde 202 (envelope sem `data`) quando a conta existe mas ainda
+ * não tem acesso ao app: o e-mail de confirmação foi enviado, não é erro.
+ */
+class EmailConfirmationRequiredException(message: String) : Exception(message)
+
 fun <T> Envelope<T>.unwrap(): T = data ?: throw ApiException(message ?: "Resposta inesperada da API")

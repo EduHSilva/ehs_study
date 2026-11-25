@@ -12,8 +12,22 @@ function toAuthUser(payload: LoginPayload): AuthSession['user'] {
   }
 }
 
+/**
+ * `login` responde 202 (envelope sem `data`) quando a conta existe mas ainda
+ * não tem acesso ao app: o e-mail de confirmação foi enviado, não é erro.
+ */
+export class AppAccessEmailSentError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AppAccessEmailSentError'
+  }
+}
+
 function toSession(res: DefaultResponse<LoginPayload>): AuthSession {
-  const payload = unwrap(res)
+  if (!res.data) {
+    throw new AppAccessEmailSentError(res.message || 'Enviamos as instruções de acesso para o seu e-mail.')
+  }
+  const payload = res.data
   if (!payload.token) throw new Error('Login sem token')
   return { token: payload.token, user: toAuthUser(payload) }
 }

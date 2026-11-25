@@ -2,6 +2,7 @@ package com.studyflow.app.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.studyflow.app.core.network.EmailConfirmationRequiredException
 import com.studyflow.app.core.settings.AppSettings
 import com.studyflow.app.data.repository.AuthRepository
 import com.studyflow.app.domain.auth.AuthValidation
@@ -15,6 +16,8 @@ import kotlinx.coroutines.launch
 data class AuthUiState(
     val pending: Boolean = false,
     val errorKey: String? = null,
+    /** 202 do login: conta sem acesso ao app, instruções enviadas por e-mail. */
+    val noticeKey: String? = null,
     val registerPending: Boolean = false,
     val registerErrorKey: String? = null,
     val registerSuccess: Boolean = false,
@@ -36,11 +39,13 @@ class AuthViewModel(
         }
         if (_state.value.pending) return
         viewModelScope.launch {
-            _state.update { it.copy(pending = true, errorKey = null) }
+            _state.update { it.copy(pending = true, errorKey = null, noticeKey = null) }
             try {
                 authRepository.login(email, password)
             } catch (e: CancellationException) {
                 throw e
+            } catch (_: EmailConfirmationRequiredException) {
+                _state.update { it.copy(noticeKey = "accessEmailSent") }
             } catch (_: Exception) {
                 _state.update { it.copy(errorKey = "loginFailed") }
             } finally {
@@ -52,11 +57,13 @@ class AuthViewModel(
     fun loginWithGoogle(idToken: String) {
         if (_state.value.pending) return
         viewModelScope.launch {
-            _state.update { it.copy(pending = true, errorKey = null) }
+            _state.update { it.copy(pending = true, errorKey = null, noticeKey = null) }
             try {
                 authRepository.loginWithGoogle(idToken)
             } catch (e: CancellationException) {
                 throw e
+            } catch (_: EmailConfirmationRequiredException) {
+                _state.update { it.copy(noticeKey = "accessEmailSent") }
             } catch (_: Exception) {
                 _state.update { it.copy(errorKey = "googleLoginFailed") }
             } finally {
@@ -92,7 +99,7 @@ class AuthViewModel(
     }
 
     fun clearError() {
-        _state.update { it.copy(errorKey = null) }
+        _state.update { it.copy(errorKey = null, noticeKey = null) }
     }
 
     fun reportGoogleFailure() {

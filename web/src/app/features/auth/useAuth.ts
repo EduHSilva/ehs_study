@@ -7,7 +7,7 @@ import {
 } from '../../composables/httpClient'
 import { resetSessionCache } from '../../composables/useSessionCache'
 import { navigate } from '../../composables/useNavigation'
-import { login as loginRequest, loginWithGoogle as googleLoginRequest, me as meRequest, register as registerRequest, updateUserName } from './auth.api'
+import { AppAccessEmailSentError, login as loginRequest, loginWithGoogle as googleLoginRequest, me as meRequest, register as registerRequest, updateUserName } from './auth.api'
 import type { AuthSession, Credentials, RegisterInput } from './types'
 
 function readStoredSession(): AuthSession | null {
@@ -37,6 +37,8 @@ const validateCredentials = (credentials: Credentials): string | null => {
 const session = ref<AuthSession | null>(readStoredSession())
 const pending = ref(false)
 const error = ref<string | null>(null)
+/** 202 do login: conta sem acesso ao app, instruções enviadas por e-mail. */
+const emailSent = ref<string | null>(null)
 const isAuthenticated = computed(() => session.value !== null)
 
 const registerPending = ref(false)
@@ -65,6 +67,7 @@ async function login(email: string, password: string): Promise<boolean> {
   }
   pending.value = true
   error.value = null
+  emailSent.value = null
   try {
     const nextSession = await loginRequest(credentials)
     resetSessionCache()
@@ -72,7 +75,11 @@ async function login(email: string, password: string): Promise<boolean> {
     persistSession(session.value)
     navigate('dashboard')
     return true
-  } catch {
+  } catch (e) {
+    if (e instanceof AppAccessEmailSentError) {
+      emailSent.value = e.message
+      return false
+    }
     error.value = useI18n().t('loginFailed')
     return false
   } finally {
@@ -83,6 +90,7 @@ async function login(email: string, password: string): Promise<boolean> {
 async function loginWithGoogle(idToken: string): Promise<boolean> {
   pending.value = true
   error.value = null
+  emailSent.value = null
   try {
     const nextSession = await googleLoginRequest(idToken)
     resetSessionCache()
@@ -90,7 +98,11 @@ async function loginWithGoogle(idToken: string): Promise<boolean> {
     persistSession(session.value)
     navigate('dashboard')
     return true
-  } catch {
+  } catch (e) {
+    if (e instanceof AppAccessEmailSentError) {
+      emailSent.value = e.message
+      return false
+    }
     error.value = useI18n().t('googleLoginFailed')
     return false
   } finally {
@@ -157,6 +169,7 @@ export function useAuth() {
     isAuthenticated,
     pending,
     error,
+    emailSent,
     login,
     loginWithGoogle,
     logout,
