@@ -4,10 +4,12 @@ import com.studyflow.app.core.network.unwrap
 import com.studyflow.app.data.mappers.Mappers
 import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectDetails
+import com.studyflow.app.data.model.ProjectStagesBatch
 import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.data.model.ProjectVersion
 import com.studyflow.app.data.model.ProjectStage
 import com.studyflow.app.data.remote.CreateProjectRequest
+import com.studyflow.app.data.remote.StageBulkRequest
 import com.studyflow.app.data.remote.VersionRequest
 import com.studyflow.app.data.remote.ProjectsApi
 import com.studyflow.app.data.remote.StageRequest
@@ -20,20 +22,35 @@ class ProjectsRepository(private val api: ProjectsApi) {
     suspend fun getProjectDetails(id: String): ProjectDetails =
         Mappers.projectDetails(api.details(id).unwrap())
 
-    suspend fun createProject(title: String, advisor: String): ProjectDetails =
+    suspend fun createProject(title: String, advisor: String, link: String = ""): ProjectDetails =
         Mappers.projectDetails(
             api.create(
-                CreateProjectRequest(title = title, advisor = advisor.ifBlank { null }),
+                CreateProjectRequest(
+                    title = title,
+                    advisor = advisor.ifBlank { null },
+                    link = link.ifBlank { null },
+                ),
             ).unwrap(),
         )
 
     suspend fun createStage(projectId: String, title: String): ProjectStage =
         Mappers.stage(api.createStage(StageRequest(projectId, title, false)).unwrap())
 
+    // Módulos do curso: as etapas numeradas são criadas em uma única chamada e já voltam com o
+    // progresso recalculado pelo back.
+    suspend fun createStages(projectId: String, titles: List<String>): ProjectStagesBatch {
+        val dto = api.createStages(StageBulkRequest(projectId, titles)).unwrap()
+        return ProjectStagesBatch(
+            stages = dto.stages.orEmpty().map(Mappers::stage),
+            projectProgress = dto.projectProgress,
+        )
+    }
+
     suspend fun updateProject(
         id: String,
         title: String,
         advisor: String,
+        link: String? = null,
         status: ProjectStatus? = null,
     ): ProjectDetails =
         Mappers.projectDetails(
@@ -42,6 +59,7 @@ class ProjectsRepository(private val api: ProjectsApi) {
                 UpdateProjectRequest(
                     title = title,
                     advisor = advisor.ifBlank { null },
+                    link = link,
                     status = status?.let {
                         when (it) {
                             ProjectStatus.DONE -> "DONE"

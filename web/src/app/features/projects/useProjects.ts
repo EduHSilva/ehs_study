@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import { onSessionCacheReset } from '../../composables/useSessionCache'
-import { createProject as createProjectRequest, createStage as createStageRequest, createVersion as createVersionRequest, deleteProject as deleteProjectRequest, getProjectDetails, getProjects, updateProject as updateProjectRequest, updateStage, updateVersion as updateVersionRequest } from './projects.api'
+import { createProject as createProjectRequest, createStage as createStageRequest, createStages as createStagesRequest, createVersion as createVersionRequest, deleteProject as deleteProjectRequest, getProjectDetails, getProjects, updateProject as updateProjectRequest, updateStage, updateVersion as updateVersionRequest } from './projects.api'
 import { getTasksForProject } from '../tasks/tasks.api'
 import { isTaskDone } from '../tasks/calendar'
 import type { Task } from '../tasks/types'
@@ -157,7 +157,9 @@ export function useProjects() {
     if (listProject) listProject.progress = projectProgress
   }
 
-  const createProject = async (title: string, advisor: string) => {
+  // `moduleTitles` já chega numerado pelo idioma ativo (ex.: "Módulo 1"); o usuário renomeia
+  // depois. As etapas são criadas em uma única chamada, junto com o projeto recém-criado.
+  const createProject = async (title: string, advisor: string, link: string, moduleTitles: string[] = []) => {
     if (!title.trim()) {
       error.value = t('projectTitleRequired')
       return false
@@ -165,7 +167,17 @@ export function useProjects() {
     savingProject.value = true
     error.value = null
     try {
-      const created = await createProjectRequest(title.trim(), advisor.trim())
+      const created = await createProjectRequest(title.trim(), advisor.trim(), link.trim())
+      if (moduleTitles.length) {
+        try {
+          const batch = await createStagesRequest(created.project.id, moduleTitles)
+          created.stages = batch.stages
+          if (batch.projectProgress !== undefined) created.project.progress = batch.projectProgress
+        } catch {
+          // O projeto já existe; só as etapas numeradas falharam e podem ser criadas à mão.
+          error.value = t('stageCreateFailed')
+        }
+      }
       projects.value = sortProjects([created.project, ...projects.value])
       details.value = created
       selectedId.value = created.project.id
@@ -184,7 +196,7 @@ export function useProjects() {
     projects.value = sortProjects(projects.value.map(project => (project.id === updated.project.id ? updated.project : project)))
   }
 
-  const saveProject = async (title: string, advisor: string): Promise<boolean> => {
+  const saveProject = async (title: string, advisor: string, link: string): Promise<boolean> => {
     if (!selectedId.value) return false
     if (!title.trim()) {
       error.value = t('projectTitleRequired')
@@ -193,7 +205,7 @@ export function useProjects() {
     savingProject.value = true
     error.value = null
     try {
-      applyProjectUpdate(await updateProjectRequest(selectedId.value, { title: title.trim(), advisor: advisor.trim() }))
+      applyProjectUpdate(await updateProjectRequest(selectedId.value, { title: title.trim(), advisor: advisor.trim(), link: link.trim() }))
       return true
     } catch {
       error.value = t('projectEditFailed')
@@ -256,6 +268,24 @@ export function useProjects() {
       applyStageProgress(saved.projectProgress)
     } catch {
       error.value = t('stageSaveFailed')
+    } finally {
+      savingStageId.value = null
+    }
+  }
+
+  // Renomear a etapa reenvia o mesmo estado de conclusão; o back devolve o progresso novo.
+  const saveStageTitle = async (stageId: string, title: string): Promise<boolean> => {
+    if (!details.value || !selectedId.value || !title.trim()) return false
+    const stage = details.value.stages.find(entry => entry.id === stageId)
+    if (!stage) return false
+    savingStageId.value = stageId
+    error.value = null
+    try {
+      Object.assign(stage, await updateStage(selectedId.value, stageId, title.trim(), stage.done))
+      return true
+    } catch {
+      error.value = t('stageSaveFailed')
+      return false
     } finally {
       savingStageId.value = null
     }
@@ -338,6 +368,7 @@ export function useProjects() {
     createStage,
     createVersion,
     toggleStage,
+    saveStageTitle,
     updateVersion
   }
 }

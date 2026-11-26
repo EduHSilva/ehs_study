@@ -187,13 +187,14 @@ export async function mockApi(page: Page, state: MockState) {
     }
 
     if (path === '/study/projects' && method === 'POST') {
-      const body = request.postDataJSON() as { title: string; status: string; advisor: string | null }
+      const body = request.postDataJSON() as { title: string; status: string; advisor: string | null; link?: string | null }
       const project = {
         id: `project-${state.nextProjectId ?? 10}`,
         title: body.title,
         status: body.status,
         progress: 0,
         advisor: body.advisor ?? '',
+        link: body.link ?? '',
         stages: [],
         versions: []
       }
@@ -212,13 +213,14 @@ export async function mockApi(page: Page, state: MockState) {
 
     if (path.startsWith('/study/projects/') && method === 'PUT') {
       const id = path.split('/').pop() ?? ''
-      const body = request.postDataJSON() as { title?: string; advisor?: string | null; status?: string | null }
+      const body = request.postDataJSON() as { title?: string; advisor?: string | null; link?: string | null; status?: string | null }
       const details = state.projectDetails?.[id] as Record<string, unknown> | undefined
       const listProject = (state.projects as Array<Record<string, unknown>> | undefined)?.find(item => item.id === id)
       const target = details ?? listProject
       if (!target) return fulfill(route, null, 404)
       if (body.title !== undefined) target.title = body.title
       if (body.advisor !== undefined) target.advisor = body.advisor ?? ''
+      if (body.link !== undefined) target.link = body.link ?? ''
       if (body.status) target.status = body.status
       if (listProject && listProject !== target) Object.assign(listProject, target)
       return fulfill(route, target)
@@ -250,6 +252,16 @@ export async function mockApi(page: Page, state: MockState) {
       const stage = { id: `stage-${Date.now()}`, name: body.title, done: body.done }
       project.stages.push(stage)
       return fulfill(route, stage)
+    }
+
+    if (path === '/study/project/stage/bulk' && method === 'POST') {
+      const body = request.postDataJSON() as { idProject: string; titles: string[] }
+      const project = state.projectDetails?.[body.idProject] as { stages?: Array<{ id: string; name: string; done: boolean }>; progress?: number } | undefined
+      if (!project) return fulfill(route, null, 404)
+      project.stages ??= []
+      const stages = (body.titles ?? []).map((title, index) => ({ id: `stage-${Date.now()}-${index}`, name: title, done: false }))
+      project.stages.push(...stages)
+      return fulfill(route, { stages, projectProgress: project.progress ?? 0 })
     }
 
     const versionMatch = path.match(/^\/study\/project\/version\/([^/]+)$/)

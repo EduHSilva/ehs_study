@@ -110,6 +110,9 @@ interface ProjectsApi {
     @POST("study/project/stage")
     suspend fun createStage(@Body body: StageRequest): Envelope<StageDto>
 
+    @POST("study/project/stage/bulk")
+    suspend fun createStages(@Body body: StageBulkRequest): Envelope<StageBulkDto>
+
     @PUT("study/project/stage/{id}")
     suspend fun updateStage(@Path("id") id: String, @Body body: StageRequest): Envelope<StageDto>
 

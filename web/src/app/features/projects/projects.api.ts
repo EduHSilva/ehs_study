@@ -24,8 +24,14 @@ interface ProjectPayload {
   status?: string | null
   progress?: number | null
   advisor?: string | null
+  link?: string | null
   stages?: ProjectStagePayload[] | null
   versions?: ProjectVersionPayload[] | null
+}
+
+interface ProjectStageBulkPayload {
+  stages?: ProjectStagePayload[] | null
+  projectProgress?: number | null
 }
 
 interface ProjectPagePayload {
@@ -48,7 +54,17 @@ function toProject(payload: ProjectPayload): Project {
     title: payload.title,
     progress: payload.progress ?? 0,
     status: toStatus(payload.status),
-    advisor: payload.advisor ?? ''
+    advisor: payload.advisor ?? '',
+    link: payload.link ?? ''
+  }
+}
+
+function toStage(payload: ProjectStagePayload, fallbackTitle = ''): ProjectStage {
+  return {
+    id: payload.id,
+    name: payload.name ?? payload.title ?? fallbackTitle,
+    done: payload.done === true,
+    projectProgress: payload.projectProgress ?? undefined
   }
 }
 
@@ -74,22 +90,28 @@ export async function getProjectDetails(id: string): Promise<ProjectDetails> {
   return toProjectDetails(payload)
 }
 
-export async function createProject(title: string, advisor: string): Promise<ProjectDetails> {
+export async function createProject(title: string, advisor: string, link = ''): Promise<ProjectDetails> {
   const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>('/study/projects', {
     method: 'POST',
-    body: JSON.stringify({ title, status: 'WAITING', advisor: advisor || null })
+    body: JSON.stringify({ title, status: 'WAITING', advisor: advisor || null, link: link || null })
   }))
   return toProjectDetails(payload)
 }
 
-// `status` ausente preserva o status atual no back; `advisor` nulo limpa o responsável.
+// `status` e `link` ausentes preservam os valores atuais no back; link vazio limpa o endereço
+// (o formulário de edição envia sempre).
 export async function updateProject(
   id: string,
-  input: { title: string; advisor: string; status?: 'WAITING' | 'WORKING' | 'DONE' }
+  input: { title: string; advisor: string; link?: string; status?: 'WAITING' | 'WORKING' | 'DONE' }
 ): Promise<ProjectDetails> {
   const payload = unwrap(await httpClient<DefaultResponse<ProjectPayload>>(`/study/projects/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({ title: input.title, advisor: input.advisor || null, ...(input.status ? { status: input.status } : {}) })
+    body: JSON.stringify({
+      title: input.title,
+      advisor: input.advisor || null,
+      ...(input.link !== undefined ? { link: input.link } : {}),
+      ...(input.status ? { status: input.status } : {})
+    })
   }))
   return toProjectDetails(payload)
 }
@@ -98,14 +120,25 @@ export async function deleteProject(id: string): Promise<void> {
   await httpClient<DefaultResponse<null>>(`/study/projects/${id}`, { method: 'DELETE' })
 }
 
-export async function createStage(projectId: string, title: string): Promise<ProjectStage> {  const payload = unwrap(await httpClient<DefaultResponse<ProjectStagePayload>>('/study/project/stage', {
+export async function createStage(projectId: string, title: string): Promise<ProjectStage> {
+  const payload = unwrap(await httpClient<DefaultResponse<ProjectStagePayload>>('/study/project/stage', {
     method: 'POST',
     body: JSON.stringify({ idProject: projectId, title, done: false })
   }))
+  return toStage(payload, title)
+}
+
+// Cria as etapas numeradas dos módulos de uma vez; o back devolve todas com o progresso novo.
+export async function createStages(
+  projectId: string,
+  titles: string[]
+): Promise<{ stages: ProjectStage[]; projectProgress?: number }> {
+  const payload = unwrap(await httpClient<DefaultResponse<ProjectStageBulkPayload>>('/study/project/stage/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ idProject: projectId, titles })
+  }))
   return {
-    id: payload.id,
-    name: payload.name ?? payload.title ?? title,
-    done: payload.done === true,
+    stages: (payload.stages ?? []).map(stage => toStage(stage)),
     projectProgress: payload.projectProgress ?? undefined
   }
 }
@@ -122,12 +155,7 @@ export async function updateStage(projectId: string, stageId: string, title: str
     method: 'PUT',
     body: JSON.stringify({ idProject: projectId, title, done })
   }))
-  return {
-    id: payload.id,
-    name: payload.name ?? payload.title ?? title,
-    done: payload.done === true,
-    projectProgress: payload.projectProgress ?? undefined
-  }
+  return toStage(payload, title)
 }
 
 export async function updateVersion(projectId: string, versionId: string, title: string, dueDate: string): Promise<ProjectVersionPayload> {

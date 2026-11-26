@@ -227,6 +227,7 @@ data class ProjectDto(
     val status: String? = null,
     val progress: Int? = null,
     val advisor: String? = null,
+    val link: String? = null,
     val stages: List<StageDto>? = null,
     val versions: List<VersionDto>? = null,
 )
@@ -239,17 +240,28 @@ data class CreateProjectRequest(
     val title: String,
     val status: String = "WAITING",
     val advisor: String? = null,
+    val link: String? = null,
 )
 
 @Serializable
 data class UpdateProjectRequest(
     val title: String,
     val advisor: String? = null,
+    val link: String? = null,
     val status: String? = null,
 )
 
 @Serializable
 data class StageRequest(val idProject: String, val title: String, val done: Boolean)
+
+@Serializable
+data class StageBulkRequest(val idProject: String, val titles: List<String>)
+
+@Serializable
+data class StageBulkDto(
+    val stages: List<StageDto>? = null,
+    val projectProgress: Int? = null,
+)
 
 @Serializable
 data class VersionRequest(val idProject: String, val title: String, val dueDate: String)

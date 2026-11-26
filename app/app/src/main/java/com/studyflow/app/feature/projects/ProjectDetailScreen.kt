@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,7 +89,10 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
     var editingProject by rememberSaveable { mutableStateOf(false) }
     var editProjectTitle by rememberSaveable { mutableStateOf("") }
     var editProjectAdvisor by rememberSaveable { mutableStateOf("") }
+    var editProjectLink by rememberSaveable { mutableStateOf("") }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    var editingStageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var stageTitleDraft by rememberSaveable { mutableStateOf("") }
 
     var showCompleted by rememberSaveable { mutableStateOf(true) }
     val expandedStages = remember { mutableStateMapOf<String, Boolean>() }
@@ -99,6 +103,7 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
     var editDue by remember { mutableStateOf<LocalDateTime?>(null) }
 
     val details = state.details
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(state.projectDeleted) {
         if (state.projectDeleted) onBack()
@@ -141,12 +146,19 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
                         placeholder = { Text(s["projectAdvisorPlaceholder"]) },
                         singleLine = true,
                     )
+                    OutlinedTextField(
+                        value = editProjectLink,
+                        onValueChange = { editProjectLink = it.take(500) },
+                        label = { Text(s["projectLinkLabel"]) },
+                        placeholder = { Text(s["projectLinkPlaceholder"]) },
+                        singleLine = true,
+                    )
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        vm.saveProject(editProjectTitle, editProjectAdvisor)
+                        vm.saveProject(editProjectTitle, editProjectAdvisor, editProjectLink)
                         editingProject = false
                     },
                     enabled = !state.savingProject && editProjectTitle.isNotBlank(),
@@ -214,6 +226,34 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
         )
     }
 
+    val stageBeingEdited = editingStageId?.let { id -> details.stages.firstOrNull { it.id == id } }
+    if (stageBeingEdited != null) {
+        AlertDialog(
+            onDismissRequest = { editingStageId = null },
+            title = { Text(s["stageEditTitleAction"]) },
+            text = {
+                OutlinedTextField(
+                    value = stageTitleDraft,
+                    onValueChange = { stageTitleDraft = it.take(200) },
+                    label = { Text(s["stageTitleLabel"]) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.updateStageTitle(stageBeingEdited.id, stageTitleDraft)
+                        editingStageId = null
+                    },
+                    enabled = stageTitleDraft.isNotBlank() && state.savingStageId != stageBeingEdited.id,
+                ) { Text(s["save"]) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingStageId = null }) { Text(s["cancelAction"]) }
+            },
+        )
+    }
+
     val isTaskDone: (Task) -> Boolean = { StudyCalendar.isTaskDone(it, state.todayKey) }
     val doneStageCount = details.stages.count { it.done }
     val visibleStages = if (showCompleted) details.stages else details.stages.filterNot { it.done }
@@ -266,6 +306,12 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (details.project.link.isNotBlank()) {
+                            LinkButton(
+                                text = s["openProjectLink"],
+                                onClick = { runCatching { uriHandler.openUri(details.project.link) } },
+                            )
+                        }
                         when (details.project.status) {
                             ProjectStatus.DONE -> Tag(
                                 text = s["projectStatusDone"],
@@ -295,6 +341,7 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
                         onClick = {
                             editProjectTitle = details.project.title
                             editProjectAdvisor = details.project.advisor
+                            editProjectLink = details.project.link
                             editingProject = true
                         },
                         shape = RoundedCornerShape(8.dp),
@@ -408,6 +455,10 @@ fun ProjectDetailScreen(projectId: String, onBack: () -> Unit, onManageTasks: ()
                                 todayKey = state.todayKey,
                                 onToggleDone = { vm.toggleStage(stage.id) },
                                 onToggleExpanded = { expandedStages[stage.id] = !(expandedStages[stage.id] == true) },
+                                onEditTitle = {
+                                    editingStageId = stage.id
+                                    stageTitleDraft = stage.name
+                                },
                             )
                         }
                     }
@@ -619,6 +670,7 @@ private fun StageSection(
     todayKey: String,
     onToggleDone: () -> Unit,
     onToggleExpanded: () -> Unit,
+    onEditTitle: () -> Unit,
 ) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -673,6 +725,20 @@ private fun StageSection(
                     s.format("stageTaskCount", "count" to tasks.size),
                     style = MaterialTheme.typography.labelSmall,
                     color = StudyFlowTheme.colors.subtle,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable(enabled = !saving, onClick = onEditTitle),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = s["stageEditTitleAction"],
+                    tint = StudyFlowTheme.colors.subtle,
+                    modifier = Modifier.size(14.dp),
                 )
             }
         }

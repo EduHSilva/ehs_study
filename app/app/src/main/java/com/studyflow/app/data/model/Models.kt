@@ -106,9 +106,12 @@ data class Project(
     val progress: Int,
     val status: ProjectStatus,
     val advisor: String,
+    val link: String = "",
 )
 
 data class ProjectStage(val id: String, val name: String, val done: Boolean, val projectProgress: Int? = null)
+
+data class ProjectStagesBatch(val stages: List<ProjectStage>, val projectProgress: Int?)
 
 data class ProjectVersion(val id: String, val title: String, val dueDate: String)
 

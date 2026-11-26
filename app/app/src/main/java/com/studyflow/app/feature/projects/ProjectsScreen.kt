@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +54,9 @@ import com.studyflow.app.data.model.Project
 import com.studyflow.app.data.model.ProjectStatus
 import com.studyflow.app.ui.appViewModel
 
+// Mesmo limite do back (POST /project/stage/bulk).
+private const val MAX_MODULES = 50
+
 @Composable
 fun ProjectsScreen(onOpenProject: (String) -> Unit) {
     val vm: ProjectsViewModel = appViewModel { ProjectsViewModel(it.projectsRepository) }
@@ -61,23 +66,27 @@ fun ProjectsScreen(onOpenProject: (String) -> Unit) {
     var showCreate by rememberSaveable { mutableStateOf(false) }
     var title by rememberSaveable { mutableStateOf("") }
     var advisor by rememberSaveable { mutableStateOf("") }
+    var link by rememberSaveable { mutableStateOf("") }
+    var modules by rememberSaveable { mutableStateOf("") }
+
+    val resetCreateForm = {
+        showCreate = false
+        title = ""
+        advisor = ""
+        link = ""
+        modules = ""
+    }
 
     LaunchedEffect(state.newProjectId) {
         val id = state.newProjectId ?: return@LaunchedEffect
         vm.consumeNewProject()
-        showCreate = false
-        title = ""
-        advisor = ""
+        resetCreateForm()
         onOpenProject(id)
     }
 
     if (showCreate) {
         AlertDialog(
-            onDismissRequest = {
-                showCreate = false
-                title = ""
-                advisor = ""
-            },
+            onDismissRequest = { resetCreateForm() },
             title = { Text(s["createProject"]) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -95,6 +104,22 @@ fun ProjectsScreen(onOpenProject: (String) -> Unit) {
                         placeholder = { Text(s["projectAdvisorPlaceholder"]) },
                         singleLine = true,
                     )
+                    OutlinedTextField(
+                        value = link,
+                        onValueChange = { link = it.take(500) },
+                        label = { Text(s["projectLinkLabel"]) },
+                        placeholder = { Text(s["projectLinkPlaceholder"]) },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = modules,
+                        onValueChange = { value -> modules = value.filter { it.isDigit() }.take(2) },
+                        label = { Text(s["moduleCountLabel"]) },
+                        placeholder = { Text(s["moduleCountPlaceholder"]) },
+                        supportingText = { Text(s["moduleCountHint"]) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                    )
                     if (state.errorKey == "projectCreateFailed") {
                         ErrorBanner(message = s["projectCreateFailed"])
                     }
@@ -102,20 +127,20 @@ fun ProjectsScreen(onOpenProject: (String) -> Unit) {
             },
             confirmButton = {
                 TextButton(
-                    onClick = { vm.create(title, advisor) },
+                    onClick = {
+                        val count = modules.toIntOrNull()?.coerceIn(0, MAX_MODULES) ?: 0
+                        // Só a quantidade é perguntada; os títulos nascem numerados e são
+                        // renomeados depois na tela do projeto.
+                        val moduleTitles = (1..count).map { index -> s.format("moduleStageName", "index" to index) }
+                        vm.create(title, advisor, link, moduleTitles)
+                    },
                     enabled = !state.savingProject,
                 ) {
                     Text(if (state.savingProject) s["saving"] else s["createProject"])
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        showCreate = false
-                        title = ""
-                        advisor = ""
-                    },
-                ) { Text(s["cancelAction"]) }
+                TextButton(onClick = { resetCreateForm() }) { Text(s["cancelAction"]) }
             },
         )
     }

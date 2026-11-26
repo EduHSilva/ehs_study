@@ -124,11 +124,39 @@ test('cadastra projeto pela tela de projetos', async ({ page }) => {
   await page.getByRole('button', { name: /Novo projeto ou curso/ }).click()
   await page.getByRole('textbox', { name: 'Título do projeto ou curso' }).fill('Pesquisa de campo')
   await page.getByRole('textbox', { name: 'Responsável (opcional)' }).fill('Prof. Costa')
+  await page.getByRole('textbox', { name: 'Link do projeto ou curso (opcional)' }).fill('https://udemy.com/estatistica')
+  await page.getByRole('spinbutton', { name: 'Quantidade de módulos (opcional)' }).fill('3')
   await page.getByRole('button', { name: 'Cadastrar projeto ou curso' }).click()
 
   await expect(page.getByRole('heading', { name: 'Pesquisa de campo' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Abrir link do projeto ou curso/ }))
+    .toHaveAttribute('href', 'https://udemy.com/estatistica')
+  await expect(page.getByRole('button', { name: /Módulo 3/ })).toBeVisible()
   expect(state.projects).toHaveLength(1)
   expect(state.projects[0]).toMatchObject({ title: 'Pesquisa de campo', advisor: 'Prof. Costa', status: 'WAITING' })
+  const created = state.projects[0] as unknown as { link: string; stages: Array<{ name: string }> }
+  expect(created.link).toBe('https://udemy.com/estatistica')
+  expect(created.stages.map(stage => stage.name)).toEqual(['Módulo 1', 'Módulo 2', 'Módulo 3'])
+})
+
+test('renomeia o título de uma etapa', async ({ page }) => {
+  const project = structuredClone(PROJECT)
+  const state = { folders: [], projects: [project], projectDetails: { 'project-1': project } }
+  await signIn(page)
+  await mockApi(page, state)
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Projetos' }).click()
+  await page.getByRole('button', { name: /TCC: História do Brasil/ }).click()
+  const stageRow = page.locator('.stage-item').filter({ hasText: 'Introdução' })
+  await stageRow.getByRole('button', { name: 'Editar nome da etapa' }).click()
+  const form = page.locator('.stage-edit-form')
+  await form.getByRole('textbox', { name: 'Nome da etapa' }).fill('Introdução revisada')
+  await form.getByRole('button', { name: 'Salvar' }).click()
+
+  await expect(page.getByRole('button', { name: /Introdução revisada/ })).toBeVisible()
+  const saved = state.projectDetails['project-1'] as { stages: Array<{ name: string }> }
+  expect(saved.stages[0].name).toBe('Introdução revisada')
 })
 
 test('recolhe etapas, filtra concluídos e destaca prazos das versões', async ({ page }) => {

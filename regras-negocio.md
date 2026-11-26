@@ -61,7 +61,16 @@
 
 - O mesmo cadastro atende projetos e cursos; não há campo de tipo e os textos da UI dizem
   "projeto ou curso".
-- Projeto ou curso tem título, status, orientador, etapas e versões.
+- Projeto ou curso tem título, status, orientador, link opcional, etapas e versões.
+- O link é opcional e serve para a página do curso/projeto: o back aparara os espaços, limpa
+  quando vazio e completa com `https://` quando o usuário digita sem esquema (máx. 500
+  caracteres). Na edição, omitir o campo preserva o link; enviar vazio limpa.
+- Ao cadastrar um curso, pode-se informar só a quantidade de módulos: os clientes criam
+  etapas numeradas ("Módulo 1", "Módulo 2"…) em uma única chamada
+  (`POST /project/stage/bulk`, até 50) e o usuário renomeia os títulos depois na tela do
+  projeto. A numeração usa o idioma ativo no momento da criação.
+- Toda etapa pode ser renomeada mantendo o estado de conclusão; a edição reenvia
+  `done` junto com o novo título.
 - Etapa tem nome e "concluída". O progresso do projeto considera etapas e tarefas: é o
   percentual inteiro de `(etapas concluídas + tarefas concluídas) / (etapas + tarefas)`, então
   uma tarefa pendente segura o percentual mesmo com a etapa já concluída. Recorrentes contam

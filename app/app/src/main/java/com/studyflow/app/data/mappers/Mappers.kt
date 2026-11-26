@@ -125,6 +125,7 @@ object Mappers {
             else -> ProjectStatus.WAITING
         },
         advisor = dto.advisor.orEmpty(),
+        link = dto.link.orEmpty(),
     )
 
     fun projectDetails(dto: ProjectDto): ProjectDetails = ProjectDetails(

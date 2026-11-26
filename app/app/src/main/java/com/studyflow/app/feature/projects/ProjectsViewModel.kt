@@ -61,7 +61,9 @@ class ProjectsViewModel(
         }
     }
 
-    fun create(title: String, advisor: String) {
+    // `moduleTitles` já chega numerado no idioma ativo (ex.: "Módulo 1"); as etapas são criadas
+    // em bloco logo após o projeto e o usuário renomeia os títulos depois.
+    fun create(title: String, advisor: String, link: String, moduleTitles: List<String> = emptyList()) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) {
             _state.update { it.copy(errorKey = "projectTitleRequired") }
@@ -71,12 +73,28 @@ class ProjectsViewModel(
         viewModelScope.launch {
             _state.update { it.copy(savingProject = true, errorKey = null) }
             try {
-                val created = projectsRepository.createProject(trimmed, advisor.trim())
+                val created = projectsRepository.createProject(trimmed, advisor.trim(), link.trim())
+                val details = if (moduleTitles.isEmpty()) {
+                    created
+                } else {
+                    try {
+                        val batch = projectsRepository.createStages(created.project.id, moduleTitles)
+                        created.copy(
+                            project = created.project.copy(progress = batch.projectProgress ?: created.project.progress),
+                            stages = batch.stages,
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // O projeto já existe; só as etapas numeradas falharam e podem ser criadas à mão.
+                        created
+                    }
+                }
                 _state.update {
                     it.copy(
-                        projects = ProjectSorting.sort(listOf(created.project) + it.projects),
+                        projects = ProjectSorting.sort(listOf(details.project) + it.projects),
                         savingProject = false,
-                        newProjectId = created.project.id,
+                        newProjectId = details.project.id,
                     )
                 }
             } catch (e: CancellationException) {
@@ -162,7 +180,7 @@ class ProjectDetailViewModel(
         }
     }
 
-    fun saveProject(title: String, advisor: String) {
+    fun saveProject(title: String, advisor: String, link: String) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) {
             _state.update { it.copy(errorKey = "projectTitleRequired") }
@@ -172,7 +190,8 @@ class ProjectDetailViewModel(
         _state.update { it.copy(savingProject = true, errorKey = null) }
         viewModelScope.launch {
             try {
-                val updated = projectsRepository.updateProject(projectId, trimmed, advisor.trim())
+                // Link vazio limpa o endereço; o back normaliza o valor recebido.
+                val updated = projectsRepository.updateProject(projectId, trimmed, advisor.trim(), link = link.trim())
                 _state.update { it.copy(details = updated) }
             } catch (e: CancellationException) {
                 throw e
@@ -237,6 +256,28 @@ class ProjectDetailViewModel(
         viewModelScope.launch {
             try {
                 val saved = projectsRepository.updateStage(projectId, stageId, stage.name, !stage.done)
+                updateStages { stages -> stages.map { if (it.id == saved.id) saved else it } }
+                applyStageProgress(saved.projectProgress)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(errorKey = "stageSaveFailed") }
+            } finally {
+                _state.update { it.copy(savingStageId = null) }
+            }
+        }
+    }
+
+    // Renomeia a etapa mantendo o estado de conclusão; o back devolve o progresso novo.
+    fun updateStageTitle(stageId: String, title: String) {
+        val trimmed = title.trim()
+        val details = _state.value.details ?: return
+        if (trimmed.isEmpty() || _state.value.savingStageId == stageId) return
+        val stage = details.stages.firstOrNull { it.id == stageId } ?: return
+        _state.update { it.copy(savingStageId = stageId, errorKey = null) }
+        viewModelScope.launch {
+            try {
+                val saved = projectsRepository.updateStage(projectId, stageId, trimmed, stage.done)
                 updateStages { stages -> stages.map { if (it.id == saved.id) saved else it } }
                 applyStageProgress(saved.projectProgress)
             } catch (e: CancellationException) {

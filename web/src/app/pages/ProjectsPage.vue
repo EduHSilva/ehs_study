@@ -6,34 +6,57 @@ import type { ProjectStatus } from '../features/projects/types'
 
 defineEmits<{ navigate:[page:AppPage] }>()
 const { t, locale } = useI18n()
-const { projects, details, selectedId, loading, savingStageId, savingVersionId, savingNewStage, savingNewVersion, savingProject, error, tasksLoading, tasksError, projectTasks, stageTasks, unassignedTasks, isTaskDone, load, selectProject, createProject, saveProject, toggleProjectStatus, removeProject, createStage, createVersion, toggleStage, updateVersion } = useProjects()
+const { projects, details, selectedId, loading, savingStageId, savingVersionId, savingNewStage, savingNewVersion, savingProject, error, tasksLoading, tasksError, projectTasks, stageTasks, unassignedTasks, isTaskDone, load, selectProject, createProject, saveProject, toggleProjectStatus, removeProject, createStage, createVersion, toggleStage, saveStageTitle, updateVersion } = useProjects()
 onMounted(load)
 
+const MAX_MODULES = 50
 const creatingProject = ref(false)
 const projectTitle = ref('')
 const projectAdvisor = ref('')
+const projectLink = ref('')
+const projectModules = ref('')
 const newStageTitle = ref('')
 const newVersionTitle = ref('')
 const newVersionDueDate = ref('')
+// Só a quantidade é perguntada: os títulos nascem numerados e podem ser renomeados depois.
+const moduleCount = computed(() => {
+  const value = Math.floor(Number(projectModules.value))
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), MAX_MODULES) : 0
+})
+const moduleTitles = () => Array.from({ length: moduleCount.value }, (_, index) => t('moduleStageName', { index: index + 1 }))
+const resetCreateForm = () => {
+  creatingProject.value = false
+  projectTitle.value = ''
+  projectAdvisor.value = ''
+  projectLink.value = ''
+  projectModules.value = ''
+}
 const submitProject = async () => {
-  if (await createProject(projectTitle.value, projectAdvisor.value)) {
-    creatingProject.value = false
-    projectTitle.value = ''
-    projectAdvisor.value = ''
-  }
+  if (await createProject(projectTitle.value, projectAdvisor.value, projectLink.value, moduleTitles())) resetCreateForm()
 }
 const editingProject = ref(false)
 const editProjectTitle = ref('')
 const editProjectAdvisor = ref('')
+const editProjectLink = ref('')
 const confirmingDelete = ref(false)
 const beginProjectEdit = () => {
   if (!details.value) return
   editProjectTitle.value = details.value.project.title
   editProjectAdvisor.value = details.value.project.advisor
+  editProjectLink.value = details.value.project.link
   editingProject.value = true
 }
 const submitProjectEdit = async () => {
-  if (await saveProject(editProjectTitle.value, editProjectAdvisor.value)) editingProject.value = false
+  if (await saveProject(editProjectTitle.value, editProjectAdvisor.value, editProjectLink.value)) editingProject.value = false
+}
+const editingStageId = ref<string | null>(null)
+const stageTitleDraft = ref('')
+const beginStageEdit = (stage: { id: string; name: string }) => {
+  editingStageId.value = stage.id
+  stageTitleDraft.value = stage.name
+}
+const submitStageTitle = async (stageId: string) => {
+  if (await saveStageTitle(stageId, stageTitleDraft.value)) editingStageId.value = null
 }
 const submitProjectStatus = async () => {
   await toggleProjectStatus()
@@ -93,6 +116,7 @@ watch(selectedId, () => {
   expandedStages.value = {}
   unassignedExpanded.value = false
   editingProject.value = false
+  editingStageId.value = null
   confirmingDelete.value = false
 })
 
@@ -148,14 +172,17 @@ const saveVersion = async (id: string) => {
         <form v-if="creatingProject" class="project-create-form" @submit.prevent="submitProject">
           <label>{{ t('projectTitleLabel') }}<input v-model="projectTitle" :placeholder="t('projectTitlePlaceholder')" required maxlength="200" /></label>
           <label>{{ t('projectAdvisorLabel') }}<input v-model="projectAdvisor" :placeholder="t('projectAdvisorPlaceholder')" maxlength="200" /></label>
-          <div class="project-create-actions"><button class="link" type="button" @click="creatingProject=false">{{ t('cancelAction') }}</button><button class="button" type="submit" :disabled="savingProject">{{ savingProject ? t('saving') : t('createProject') }}</button></div>
+          <label>{{ t('projectLinkLabel') }}<input v-model="projectLink" type="text" :placeholder="t('projectLinkPlaceholder')" maxlength="500" /></label>
+          <label>{{ t('moduleCountLabel') }}<input v-model="projectModules" type="number" min="0" :max="MAX_MODULES" step="1" inputmode="numeric" :placeholder="t('moduleCountPlaceholder')" /></label>
+          <small class="module-hint">{{ t('moduleCountHint') }}</small>
+          <div class="project-create-actions"><button class="link" type="button" @click="resetCreateForm">{{ t('cancelAction') }}</button><button class="button" type="submit" :disabled="savingProject">{{ savingProject ? t('saving') : t('createProject') }}</button></div>
         </form>
         <p v-if="!projects.length && !error" class="empty-note">{{ t('noProjects') }}</p>
         <button v-for="project in projects" :key="project.id" class="project" :class="{selected:project.id===selectedId}" @click="selectProject(project.id)"><div class="project-heading"><strong>{{project.title}}</strong><em v-if="project.status === 'Concluído'" class="project-done-tag">{{ t('projectStatusDone') }}</em></div><span><i :style="{width:`${project.progress}%`}"/></span><small>{{ t('percentCompleted', { progress: project.progress }) }}</small></button>
         <button v-if="!creatingProject" class="project-new" @click="creatingProject=true">＋ {{ t('newProject') }}</button>
       </article>
       <article v-if="details" class="card project-details">
-        <div class="card-title"><div><h2>{{details.project.title}}</h2><p>{{ t('advisorLabel') }} {{details.project.advisor || t('noAdvisor')}}</p></div><span class="priority" :class="statusClass(details.project.status)">{{ statusLabel(details.project.status) }}</span></div>
+        <div class="card-title"><div><h2>{{details.project.title}}</h2><p>{{ t('advisorLabel') }} {{details.project.advisor || t('noAdvisor')}}</p><a v-if="details.project.link" class="project-link" :href="details.project.link" target="_blank" rel="noopener noreferrer">{{ t('openProjectLink') }} ↗</a></div><span class="priority" :class="statusClass(details.project.status)">{{ statusLabel(details.project.status) }}</span></div>
         <div class="project-actions">
           <button class="chip" type="button" @click="beginProjectEdit">✎ {{ t('editProjectAction') }}</button>
           <button class="chip" type="button" :disabled="savingProject" @click="submitProjectStatus">{{ details.project.status === 'Concluído' ? t('reopenProjectAction') : t('archiveProjectAction') }}</button>
@@ -169,6 +196,7 @@ const saveVersion = async (id: string) => {
         <form v-if="editingProject" class="project-create-form project-edit-form" @submit.prevent="submitProjectEdit">
           <label>{{ t('projectTitleLabel') }}<input v-model="editProjectTitle" :placeholder="t('projectTitlePlaceholder')" required maxlength="200" /></label>
           <label>{{ t('projectAdvisorLabel') }}<input v-model="editProjectAdvisor" :placeholder="t('projectAdvisorPlaceholder')" maxlength="200" /></label>
+          <label>{{ t('projectLinkLabel') }}<input v-model="editProjectLink" type="text" :placeholder="t('projectLinkPlaceholder')" maxlength="500" /></label>
           <div class="project-create-actions"><button class="link" type="button" @click="editingProject=false">{{ t('cancelAction') }}</button><button class="button" type="submit" :disabled="savingProject">{{ savingProject ? t('saving') : t('save') }}</button></div>
         </form>
         <div class="stage-heading"><h3>{{ t('stagesTitle') }}</h3><div class="stages-toolbar"><button class="chip" :class="{ active: !showCompleted }" :aria-pressed="!showCompleted" @click="showCompleted = !showCompleted">{{ showCompleted ? t('hideCompleted') : t('showCompleted') }}<small v-if="completedStageCount">{{ completedStageCount }}</small></button><button v-if="details.stages.length" class="chip" @click="toggleAllStages">{{ allStagesExpanded ? t('collapseAllStages') : t('expandAllStages') }}</button></div></div>
@@ -179,7 +207,13 @@ const saveVersion = async (id: string) => {
           <div class="stage-row">
             <button class="stage-check" :class="{ checked: stage.done }" :disabled="savingStageId===stage.id" :aria-label="stage.done ? t('reopenStage') : t('completeStage')" :title="stage.done ? t('reopenStage') : t('completeStage')" @click="toggleStage(stage.id)">✓</button>
             <button class="stage-toggle" :aria-expanded="isStageExpanded(stage.id)" @click="toggleStageExpanded(stage.id)"><span class="stage-chevron" :class="{ open: isStageExpanded(stage.id) }" aria-hidden="true">›</span><span class="stage-name" :class="{ done: stage.done }">{{ stage.name }}</span><small class="stage-count">{{ t('stageTaskCount', { count: stageTasksFor(stage.id).length }) }}</small></button>
+            <button class="stage-edit" type="button" :disabled="savingStageId===stage.id" :aria-label="t('stageEditTitleAction')" :title="t('stageEditTitleAction')" @click="beginStageEdit(stage)">✎</button>
           </div>
+          <form v-if="editingStageId===stage.id" class="stage-edit-form" @submit.prevent="submitStageTitle(stage.id)">
+            <input v-model="stageTitleDraft" :aria-label="t('stageTitleLabel')" required maxlength="200" />
+            <button class="button" type="submit" :disabled="savingStageId===stage.id">{{ savingStageId===stage.id ? t('saving') : t('save') }}</button>
+            <button class="link" type="button" @click="editingStageId=null">{{ t('cancelAction') }}</button>
+          </form>
           <div v-if="isStageExpanded(stage.id)" class="stage-body">
             <ul v-if="stageTasksFor(stage.id).length" class="stage-tasks"><li v-for="task in stageTasksFor(stage.id)" :key="task.id" :class="{done:isTaskDone(task)}"><span class="checkbox" :class="{checked:isTaskDone(task)}">✓</span><span>{{ task.title }}</span><span v-if="task.type === 'DAILY'" class="tag daily">{{ t('taskTypeDaily') }}</span></li></ul>
             <p v-else-if="stageTasks(stage.id).length" class="empty-note">{{ t('noVisibleTasks') }}</p>
@@ -231,6 +265,15 @@ const saveVersion = async (id: string) => {
 </template>
 <style scoped>
 .progress-hint{margin:8px 0 0;color:var(--color-muted);font-size:12px;line-height:1.45}
+.module-hint{margin:-4px 0 0;color:var(--color-muted);font-size:12px;line-height:1.45}
+.project-link{display:inline-block;margin-top:2px;color:var(--color-primary);font-size:13px;font-weight:600;text-decoration:none;overflow-wrap:anywhere}
+.project-link:hover{text-decoration:underline}
+.stage-edit{flex:none;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--color-muted);font-size:13px;cursor:pointer}
+.stage-edit:hover{background:var(--color-primary-soft);color:var(--color-primary)}
+.stage-edit:disabled{opacity:.55;cursor:default}
+.stage-edit-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--color-border)}
+.stage-edit-form input{min-width:0;flex:1;height:36px;padding:0 10px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-surface);color:var(--color-text);font:400 14px var(--font-body)}
+.stage-edit-form input:focus-visible{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 18%,transparent);outline:none}
 .project-create-form{display:grid;gap:12px;padding:12px 0}
 .project-new{width:100%;height:38px;margin-top:14px;border:1px dashed var(--color-border-strong);border-radius:10px;background:transparent;color:var(--color-primary);font:600 12.5px var(--font-body);cursor:pointer;transition:background .15s,border-color .15s}
 .project-new:hover{background:var(--color-primary-soft);border-color:var(--color-primary)}
